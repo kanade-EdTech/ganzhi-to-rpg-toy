@@ -1,8 +1,8 @@
 /**
  * UI 交互层
  */
-import { calcBazi, TIANGAN, DIZHI, TG_WUXING, DZ_WUXING, DZ_CANGGAN, hourToDZ, SHENGXIAO } from './ganzhi.js';
-import { fullCalc, SHISHEN_RPG, WUXING_RPG, SHISHEN_NAMES } from './rpg.js';
+import { calcBazi, TIANGAN, DIZHI, TG_WUXING, DZ_WUXING, DZ_CANGGAN, hourToDZ, SHENGXIAO, CHANGSHENG_MULT, Solar, Lunar, LunarYear, LunarMonth, getSolarDays } from './ganzhi.js';
+import { fullCalc, calcShishen, SHISHEN_RPG, WUXING_RPG, SHISHEN_NAMES } from './rpg.js';
 
 // ── 状态 ─────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ let state = {
   hour: 14, minute: 30,
   useShichen: false,
   shichenIdx: 7,      // 默认未时（index in DIZHI，7=未）
-  zishiType: 'late',  // early(早子时00-01) | late(晚子时23-24)
+  zishiType: 'early',  // early(早子时00-01) | late(晚子时23-24)
 
   // 计算结果
   result: null,
@@ -39,6 +39,17 @@ const SHICHEN_LIST = [
 ];
 
 const WUXING_CLASS = { '木':'wx-wood', '火':'wx-fire', '土':'wx-earth', '金':'wx-metal', '水':'wx-water' };
+
+// 农历月份汉字名（index 1-12 → 正月/二月...冬月/腊月）
+const LUNAR_MONTH_NAMES = [
+  '', '正月','二月','三月','四月','五月','六月',
+  '七月','八月','九月','十月','冬月','腊月',
+];
+
+// 数字 1-30 → 农历日汉字（初一、初二...初十、十一...二十、廿一...三十）
+const LUNAR_DAY_NAMES = ['', '初一','初二','初三','初四','初五','初六','初七','初八','初九','初十',
+  '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十',
+  '廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'];
 
 const TOTEM_CHARS = { '木':'🌿','火':'🔥','土':'⛰','金':'⚔','水':'💧' };
 
@@ -79,10 +90,14 @@ function getHourForCalc() {
 }
 
 function getEffectiveYear() {
-  return state.era === 'BC' ? -Math.abs(state.year) : Math.abs(state.year);
+  return state.era === 'BC' ? 1 - Math.abs(state.year) : Math.abs(state.year);
 }
 
 // ── 渲染工具 ─────────────────────────────────────────────────
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
 
 function qs(sel) { return document.querySelector(sel); }
 function qsa(sel) { return document.querySelectorAll(sel); }
@@ -104,6 +119,7 @@ export function initUI() {
   renderShichenGrid();
   updateTimeHint();
   updateYearDisplay();
+  updateDatePreview();
 }
 
 // ── 头部 ─────────────────────────────────────────────────────
@@ -226,30 +242,45 @@ function buildLeftPanel() {
 }
 
 function populateMonthDay() {
-  const selMonth = qs('#sel-month');
-  const selDay   = qs('#sel-day');
-  selMonth.innerHTML = Array.from({length:12}, (_,i) => `<option value="${i+1}">${i+1} 月</option>`).join('');
-  selMonth.value = state.month;
+  refreshMonthOptions();
   refreshDayOptions();
+}
+
+/** 月份下拉选项（公历/农历分别渲染） */
+function refreshMonthOptions() {
+  const selMonth = qs('#sel-month');
+  const opts = Array.from({ length: 12 }, (_, i) => {
+    const v = i + 1;
+    const label = state.useLunar ? LUNAR_MONTH_NAMES[v] : `${v} 月`;
+    return `<option value="${v}">${label}</option>`;
+  }).join('');
+  selMonth.innerHTML = opts;
+  selMonth.value = state.month;
 }
 
 function refreshDayOptions() {
   const selDay = qs('#sel-day');
   const year   = getEffectiveYear();
   const month  = parseInt(qs('#sel-month').value);
-  // 用 JS Date 算当月天数（year 为负时回退到 28 天保守值）
-  let days;
-  if (year > 100) {
-    days = new Date(year, month, 0).getDate();
+  let validDays;
+  if (state.useLunar) {
+    const leapMonth = LunarYear.fromYear(year).getLeapMonth();
+    const leap = qs('#cb-leap');
+    leap.disabled = leapMonth !== month;
+    if (leap.disabled) leap.checked = false;
+    qs('#leap-hint').textContent = leapMonth ? `本年闰 ${LUNAR_MONTH_NAMES[leapMonth]}` : '本年无闰月';
+    const lunarMonth = LunarMonth.fromYm(year, leap.checked ? -month : month);
+    validDays = Array.from({ length: lunarMonth.getDayCount() }, (_, i) => i + 1);
   } else {
-    // 公元前或极远年份：用标准算法推算
-    const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-    days = [0,31,isLeap?29:28,31,30,31,30,31,31,30,31,30,31][month] || 30;
+    validDays = getSolarDays(year, month);
   }
-  const cur = Math.min(parseInt(selDay.value) || state.day, days);
-  selDay.innerHTML = Array.from({length:days}, (_,i) =>
-    `<option value="${i+1}"${i+1===cur?' selected':''}>${i+1} 日</option>`
-  ).join('');
+  const previous = Number(selDay.value) || state.day;
+  const cur = validDays.includes(previous) ? previous : validDays.find(d => d >= previous) || validDays.at(-1);
+  selDay.innerHTML = validDays.map(day => {
+    const label = state.useLunar ? LUNAR_DAY_NAMES[day] : `${day} 日`;
+    return `<option value="${day}"${day === cur ? ' selected' : ''}>${label}</option>`;
+  }).join('');
+  state.day = cur;
 }
 
 function buildAnchorRow() {
@@ -324,6 +355,8 @@ function attachEvents() {
     state.useLunar = e.target.dataset.val === 'lunar';
     setSegment('#seg-date-mode', e.target.dataset.val);
     qs('#lunar-run-row').style.display = state.useLunar ? 'flex' : 'none';
+    refreshMonthOptions();
+    refreshDayOptions();
     updateDatePreview();
   });
 
@@ -332,12 +365,16 @@ function attachEvents() {
     if (!e.target.dataset.val) return;
     state.era = e.target.dataset.val;
     setSegment('#seg-era', state.era);
-    updateYearDisplay();
+    refreshDayOptions();
+    updateDatePreview();
   });
 
   // 年份输入
   qs('#input-year').addEventListener('input', e => {
-    state.year = Math.abs(parseInt(e.target.value) || 1);
+    const value = Number(e.target.value);
+    if (value < 0) { state.era = 'BC'; setSegment('#seg-era', 'BC'); e.target.value = Math.abs(value); }
+    state.year = Math.min(5000, Math.max(1, Math.abs(Math.trunc(value)) || 1));
+    e.target.value = state.year;
     updateYearDisplay();
     refreshDayOptions();
     updateDatePreview();
@@ -369,10 +406,27 @@ function attachEvents() {
     updateDatePreview();
   });
 
+  qs('#cb-leap').addEventListener('change', () => {
+    refreshDayOptions();
+    updateDatePreview();
+  });
+
   // 现代/时辰切换
   qs('#seg-time-mode').addEventListener('click', e => {
     if (!e.target.dataset.val) return;
     state.useShichen = e.target.dataset.val === 'shichen';
+    if (state.useShichen) {
+      state.shichenIdx = hourToDZ(state.hour);
+      state.zishiType = state.hour === 23 ? 'late' : 'early';
+      renderShichenGrid();
+      qs('#zishi-extra').classList.toggle('show', state.shichenIdx === 0);
+      setSegment('#zishi-extra', state.zishiType);
+    } else {
+      state.hour = state.shichenIdx === 0 ? (state.zishiType === 'early' ? 0 : 23) : state.shichenIdx * 2 - 1;
+      state.minute = 0;
+      qs('#input-hour').value = state.hour;
+      qs('#input-minute').value = 0;
+    }
     setSegment('#seg-time-mode', e.target.dataset.val);
     qs('#modern-time-ui').style.display  = state.useShichen ? 'none' : 'block';
     qs('#shichen-time-ui').style.display = state.useShichen ? 'block' : 'none';
@@ -382,10 +436,12 @@ function attachEvents() {
   // 小时/分钟
   qs('#input-hour').addEventListener('input', e => {
     state.hour = Math.min(23, Math.max(0, parseInt(e.target.value) || 0));
+    e.target.value = state.hour;
     updateTimeHint();
   });
   qs('#input-minute').addEventListener('input', e => {
     state.minute = Math.min(59, Math.max(0, parseInt(e.target.value) || 0));
+    e.target.value = state.minute;
   });
 
   // 时辰方格点击
@@ -418,11 +474,19 @@ function attachEvents() {
     state.minute = 0;
     state.gender = ['乾造','坤造','无相'][Math.floor(Math.random() * 3)];
     state.useLunar = false;
+    state.useShichen = false;
+    setSegment('#seg-date-mode', 'solar');
+    setSegment('#seg-time-mode', 'modern');
+    qs('#lunar-run-row').style.display = 'none';
+    qs('#modern-time-ui').style.display = 'block';
+    qs('#shichen-time-ui').style.display = 'none';
+    qs('#cb-leap').checked = false;
 
     qs('#input-name').value = state.name;
     setSegment('#seg-gender', state.gender);
     setSegment('#seg-era', state.era);
     qs('#input-year').value = state.year;
+    refreshMonthOptions();
     qs('#sel-month').value  = state.month;
     refreshDayOptions();
     qs('#sel-day').value    = state.day;
@@ -452,7 +516,7 @@ function attachEvents() {
   document.addEventListener('mouseover', handleTooltip);
   document.addEventListener('mousemove', moveTooltip);
   document.addEventListener('mouseout', e => {
-    if (!e.target.closest('[data-tip]')) qs('#tooltip').classList.remove('show');
+    if (e.target.closest('[data-tip]')) qs('#tooltip').classList.remove('show');
   });
 }
 
@@ -470,18 +534,21 @@ function doCalc() {
   const btn = qs('#btn-calc');
   btn.classList.add('loading');
 
-  setTimeout(() => {
-    try {
-      const bazi  = calcBazi(year, month, day, hour);
-      const result = fullCalc(bazi);
-      state.result = { bazi, ...result };
-      renderResult(bazi, result);
-    } catch (e) {
-      console.error(e);
-      alert('排盘出错：' + e.message);
-    }
+  try {
+    const minute = state.useShichen ? 0 : state.minute;
+    const solar = state.useLunar
+      ? Lunar.fromYmdHms(year, qs('#cb-leap').checked ? -month : month, day, hour, minute, 0).getSolar()
+      : Solar.fromYmdHms(year, month, day, hour, minute, 0);
+    const bazi = calcBazi(solar.getYear(), solar.getMonth(), solar.getDay(), hour, minute);
+    const result = fullCalc(bazi);
+    state.result = { bazi, ...result, name: state.name, gender: state.gender };
+    renderResult(bazi, result);
+  } catch (e) {
+    console.error(e);
+    alert('排盘出错：' + e.message);
+  } finally {
     btn.classList.remove('loading');
-  }, 30); // 短暂延迟让按钮动效可见
+  }
 }
 
 // ── 渲染结果 ─────────────────────────────────────────────────
@@ -518,7 +585,7 @@ function renderBanner(bazi, result) {
     </div>`;
   }).join('');
 
-  const genderTag = state.gender;
+  const genderTag = state.result.gender;
 
   qs('#banner-section').innerHTML = `
     <div class="banner-totem" style="border-color:${WUXING_RPG[dmWx].color};box-shadow:0 0 20px ${WUXING_RPG[dmWx].color}33">
@@ -526,7 +593,7 @@ function renderBanner(bazi, result) {
     </div>
     <div class="banner-info">
       <div class="banner-name-row">
-        <span class="banner-name">${state.name}</span>
+        <span class="banner-name">${escapeHTML(state.result.name)}</span>
         <span class="banner-gender">${genderTag}</span>
         <span class="banner-grade">${grade}</span>
       </div>
@@ -600,7 +667,7 @@ function renderStats(result) {
 
       html += `<div class="stat-row" data-ss="${ss}"
           data-tip="${ss} · ${rpgInfo.attr}\n积分：${score.toFixed(1)} pt\n来源：\n${sources}"
-          data-tg-highlight="${(sourceMap[ss]||[]).filter(d=>!d.isCang).map(d=>d.char).join(',')}">
+          data-pillar-highlight="${[...new Set((sourceMap[ss]||[]).map(d=>d.pillar))].join(',')}">
         <div class="stat-seal ${qc}" style="color:${rpgInfo.color};border-color:${rpgInfo.color}33">${ss}</div>
         <div class="stat-name">${rpgInfo.attr}</div>
         <div class="stat-bar-track">
@@ -616,10 +683,9 @@ function renderStats(result) {
   // hover 高亮联动四柱
   qsa('.stat-row').forEach(row => {
     row.addEventListener('mouseenter', () => {
-      const chars = (row.dataset.tgHighlight || '').split(',').filter(Boolean);
+      const labels = (row.dataset.pillarHighlight || '').split(',').filter(Boolean);
       qsa('.pillar').forEach(p => {
-        const tgEl = p.querySelector('.pillar-tg');
-        if (tgEl && chars.includes(tgEl.textContent.trim())) {
+        if (labels.includes(p.dataset.pillar)) {
           p.classList.add('highlight');
         }
       });
@@ -661,13 +727,13 @@ function renderPillar(bazi, result) {
     const csClass = ['帝旺','临官','长生','冠带'].includes(p.changsheng) ? 'cs-strong'
                   : ['病','死','墓','绝'].includes(p.changsheng) ? 'cs-weak' : '';
 
-    return `<div class="pillar${isDayMaster ? ' day-pillar' : ''}">
+    return `<div data-pillar="${LABELS[i]}" class="pillar${isDayMaster ? ' day-pillar' : ''}">
       <div class="pillar-label">${LABELS[i]}</div>
       <div class="pillar-shishen${isDayMaster ? ' rizhu' : ''}">${ssLabel}</div>
       <div class="pillar-tg ${WUXING_CLASS[tgWx]}">${TIANGAN[p.tg]}</div>
-      <div class="pillar-dz ${WUXING_CLASS[dzWx]}" data-tip="${dzKey}·${shengxiao}·${dzWx}五行">${dzKey}</div>
+      <div class="pillar-dz ${WUXING_CLASS[dzWx]}" data-tip="${dzKey}·${shengxiao}·${dzWx}五行">${dzKey}<span class="pillar-benqi">${dzSS}</span></div>
       <div class="pillar-cang">${cangTags}</div>
-      <div class="pillar-changsheng ${csClass}" data-tip="${p.changsheng}：该柱词条效力 ×${({帝旺:1.25,临官:1.20,长生:1.15,冠带:1.10}[p.changsheng]||1.00).toFixed(2)}">${p.changsheng}</div>
+      <div class="pillar-changsheng ${csClass}" data-tip="${p.changsheng}：该柱词条效力 ×${CHANGSHENG_MULT[p.changsheng].toFixed(2)}">${p.changsheng}</div>
     </div>`;
   }).join('');
 }
@@ -708,7 +774,7 @@ function handleTooltip(e) {
   const el = e.target.closest('[data-tip]');
   const tip = qs('#tooltip');
   if (!el) { tip.classList.remove('show'); return; }
-  tip.innerHTML = el.dataset.tip.replace(/\n/g, '<br>');
+  tip.textContent = el.dataset.tip;
   tip.classList.add('show');
 }
 
@@ -738,28 +804,31 @@ function updateTimeHint() {
 function updateDatePreview() {
   const el = qs('#date-preview');
   if (!el) return;
-  if (state.useLunar) {
-    el.textContent = '（农历模式：显示对应公历日期功能开发中）';
-  } else {
-    // 简单显示干支年
+  try {
     const y = getEffectiveYear();
-    const yCycleOffset = ((y - 4) % 60 + 60) % 60;
-    const tg = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'][yCycleOffset % 10];
-    const dz = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'][yCycleOffset % 12];
-    const sx = SHENGXIAO[yCycleOffset % 12];
-    el.textContent = `干支纪年：${tg}${dz}年（${sx}年）`;
+    const month = Number(qs('#sel-month').value);
+    const day = Number(qs('#sel-day').value);
+    if (state.useLunar) {
+      const lunar = Lunar.fromYmd(y, qs('#cb-leap').checked ? -month : month, day);
+      el.textContent = `对应公历：${lunar.getSolar().toYmd()}`;
+    } else {
+      const lunar = Solar.fromYmd(y, month, day).getLunar();
+      el.textContent = `对应农历：${lunar.getYearInGanZhi()}年 ${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
+    }
+  } catch (error) {
+    el.textContent = `日期无效：${error.message}`;
   }
 }
 
 // ── 复制 Markdown ─────────────────────────────────────────────
 
-function copyMarkdown() {
+async function copyMarkdown() {
   if (!state.result) return;
   const { bazi, shishenScores, rpgStats, titleData, grade } = state.result;
   const pillars = [bazi.year, bazi.month, bazi.day, bazi.hour];
   const LABELS  = ['年柱','月柱','日柱','时柱'];
 
-  let md = `# ${state.name} · 先天命格设定\n\n`;
+  let md = `# ${state.result.name} · 先天命格设定\n\n`;
   md += `**命格称号**：【${titleData.title} · ${titleData.tag}】  \n`;
   md += `**先天潜力**：${grade}  \n`;
   md += `**推荐流派**：${titleData.build}  \n`;
@@ -773,11 +842,14 @@ function copyMarkdown() {
     md += `- **${ss}·${SHISHEN_RPG[ss].attr}**：${rpgStats[ss]?.display || '-'}\n`;
   });
 
-  navigator.clipboard.writeText(md).then(() => {
+  try {
+    await navigator.clipboard.writeText(md);
     const btn = qs('#btn-copy-md');
     btn.textContent = '✅ 已复制';
     setTimeout(() => { btn.textContent = '📋 复制 Markdown 设定'; }, 2000);
-  });
+  } catch (error) {
+    alert('复制失败，请允许浏览器访问剪贴板后重试。');
+  }
 }
 
 // ── 对比栏 ──────────────────────────────────────────────────
@@ -785,7 +857,7 @@ function copyMarkdown() {
 function addToCompare() {
   if (!state.result) return;
   const slot = state.compareSlots[0] === null ? 0 : 1;
-  state.compareSlots[slot] = { name: state.name, result: state.result };
+  state.compareSlots[slot] = { name: state.result.name, result: state.result };
   if (state.compareSlots.some(s => s !== null)) {
     renderCompareBar();
   }
@@ -803,7 +875,7 @@ function renderCompareBar() {
     if (!slot) return `<div class="compare-slot empty">空位 ${i+1}（存入对比）</div>`;
     const top1 = Object.entries(slot.result.shishenScores).sort((a,b)=>b[1]-a[1])[0];
     return `<div class="compare-slot">
-      <strong>${slot.name}</strong> · ${slot.result.titleData.title}<br>
+      <strong>${escapeHTML(slot.name)}</strong> · ${slot.result.titleData.title}<br>
       最强属性：${top1[0]} ${SHISHEN_RPG[top1[0]].attr} (${top1[1].toFixed(1)}pt)
     </div>`;
   }).join('') + `<button class="btn btn-ghost" onclick="document.getElementById('compare-bar').classList.remove('show')">关闭</button>`;
