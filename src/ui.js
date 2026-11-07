@@ -3,6 +3,7 @@
  */
 import { calcBazi, TIANGAN, DIZHI, TG_WUXING, DZ_WUXING, DZ_CANGGAN, hourToDZ, SHENGXIAO, CHANGSHENG_MULT, Solar, Lunar, LunarYear, LunarMonth, getSolarDays } from './ganzhi.js';
 import { fullCalc, calcShishen, SHISHEN_RPG, WUXING_RPG, SHISHEN_NAMES } from './rpg.js';
+import { loadEraData, getDynastyList, getErasByDynasty, lookupEra, astroToState } from './era.js';
 
 // ── 状态 ─────────────────────────────────────────────────────
 
@@ -17,6 +18,10 @@ let state = {
   useShichen: false,
   shichenIdx: 7,      // 默认未时（index in DIZHI，7=未）
   zishiType: 'early',  // early(早子时00-01) | late(晚子时23-24)
+
+  // 年号模式
+  useEraInput: false,  // 是否用年号输入年份
+  eraDataReady: false,
 
   // 计算结果
   result: null,
@@ -160,8 +165,14 @@ function buildLeftPanel() {
         </div>
       </div>
 
-      <!-- 纪元 -->
-      <div class="form-row">
+      <!-- 纪年：数字 / 年号 切换 -->
+      <div class="seg-ctrl" id="seg-year-mode" style="margin-bottom:8px">
+        <button data-val="number" class="active">数字纪年</button>
+        <button data-val="era">📜 年号纪年</button>
+      </div>
+
+      <!-- 数字纪年 -->
+      <div class="form-row" id="row-year-number">
         <span class="form-label">纪年</span>
         <div class="seg-ctrl" id="seg-era" style="width:auto">
           <button data-val="AD" class="active">公元 AD</button>
@@ -169,6 +180,23 @@ function buildLeftPanel() {
         </div>
         <input type="number" id="input-year" value="2026" min="1" max="5000" style="width:80px">
         <span style="font-size:0.8rem;color:var(--text-dim)">年</span>
+      </div>
+
+      <!-- 年号纪年 -->
+      <div id="row-year-era" style="display:none">
+        <div class="form-row">
+          <span class="form-label">朝代</span>
+          <select id="sel-era-dynasty" style="flex:1"></select>
+          <span class="form-label">年号</span>
+          <select id="sel-era-name" style="flex:1"></select>
+        </div>
+        <div class="form-row">
+          <span class="form-label">年次</span>
+          <input type="number" id="input-era-year" value="1" min="1" style="width:80px">
+          <span style="font-size:0.8rem;color:var(--text-dim)" id="era-year-hint">年</span>
+          <button class="btn btn-ghost" id="btn-apply-era" style="margin-left:auto">应用</button>
+        </div>
+        <div class="lunar-preview" id="era-info">从年号表载入中…</div>
       </div>
 
       <!-- 快捷锚点 -->
@@ -310,6 +338,7 @@ function buildRightPanel() {
       </div>
       <!-- 底部工具栏 -->
       <div id="footer-section">
+        <button class="btn btn-ghost" id="btn-export-img">📸 导出命格卡</button>
         <button class="btn btn-ghost" id="btn-copy-md">📋 复制 Markdown 设定</button>
         <button class="btn btn-ghost" id="btn-compare">⚔️ 存入对比栏</button>
       </div>
@@ -367,6 +396,35 @@ function attachEvents() {
     setSegment('#seg-era', state.era);
     refreshDayOptions();
     updateDatePreview();
+  });
+
+  // 数字纪年 / 年号纪年 切换
+  qs('#seg-year-mode').addEventListener('click', async e => {
+    if (!e.target.dataset.val) return;
+    state.useEraInput = e.target.dataset.val === 'era';
+    setSegment('#seg-year-mode', e.target.dataset.val);
+    qs('#row-year-number').style.display = state.useEraInput ? 'none' : 'flex';
+    qs('#row-year-era').style.display    = state.useEraInput ? 'block' : 'none';
+    if (state.useEraInput && !state.eraDataReady) {
+      await initEraInput();
+    }
+  });
+
+  // 朝代切换 → 刷新年号下拉
+  qs('#sel-era-dynasty').addEventListener('change', async () => {
+    await refreshEraNames();
+  });
+
+  // 年号切换 → 刷新年次提示
+  qs('#sel-era-name').addEventListener('change', () => {
+    updateEraYearHint();
+  });
+
+  // 应用年号 → 设置 state.year/era
+  qs('#btn-apply-era').addEventListener('click', applyEra);
+
+  qs('#input-era-year').addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyEra();
   });
 
   // 年份输入
@@ -475,11 +533,15 @@ function attachEvents() {
     state.gender = ['乾造','坤造','无相'][Math.floor(Math.random() * 3)];
     state.useLunar = false;
     state.useShichen = false;
+    state.useEraInput = false;
     setSegment('#seg-date-mode', 'solar');
     setSegment('#seg-time-mode', 'modern');
+    setSegment('#seg-year-mode', 'number');
     qs('#lunar-run-row').style.display = 'none';
     qs('#modern-time-ui').style.display = 'block';
     qs('#shichen-time-ui').style.display = 'none';
+    qs('#row-year-number').style.display = 'flex';
+    qs('#row-year-era').style.display    = 'none';
     qs('#cb-leap').checked = false;
 
     qs('#input-name').value = state.name;
@@ -505,6 +567,9 @@ function attachEvents() {
 
   // 复制 Markdown
   qs('#btn-copy-md').addEventListener('click', copyMarkdown);
+
+  // 导出命格卡图片
+  qs('#btn-export-img').addEventListener('click', exportImage);
 
   // 存入对比栏
   qs('#btn-compare').addEventListener('click', addToCompare);
@@ -850,6 +915,151 @@ async function copyMarkdown() {
   } catch (error) {
     alert('复制失败，请允许浏览器访问剪贴板后重试。');
   }
+}
+
+// ── 导出命格卡为图片 ─────────────────────────────────────────
+
+async function exportImage() {
+  if (!state.result) return;
+  const btn = qs('#btn-export-img');
+  const oldText = btn.textContent;
+  btn.textContent = '⏳ 渲染中…';
+  btn.disabled = true;
+
+  // 用 html2canvas 把命格卡区域渲染为 PNG
+  // 区域：右栏铭牌 + Top3 + 全属性（不含底部工具栏，避免把按钮也截进去）
+  const target = qs('#banner-section');
+  const top3 = qs('#top3-section').closest('.card');
+  const stats = qs('#stats-section').closest('.card');
+  const blocks = [target, top3, stats].filter(Boolean);
+
+  try {
+    if (typeof html2canvas === 'undefined') {
+      throw new Error('html2canvas 未加载，请检查网络');
+    }
+
+    // 等字体加载完成，避免截图字体回退
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+
+    // 拼接几张卡片到一个临时容器，便于一次性截图
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:760px;padding:24px;background:#121316;display:flex;flex-direction:column;gap:16px;';
+    blocks.forEach(b => {
+      const clone = b.cloneNode(true);
+      // 移除可能的 hover 高亮
+      clone.classList.remove('highlight','highlighted');
+      wrap.appendChild(clone);
+    });
+    document.body.appendChild(wrap);
+
+    const canvas = await html2canvas(wrap, {
+      backgroundColor: '#121316',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    document.body.removeChild(wrap);
+
+    const name = state.result.name || '角色';
+    const link = document.createElement('a');
+    link.download = `${name}-先天命格卡.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+
+    btn.textContent = '✅ 已导出';
+  } catch (err) {
+    console.error(err);
+    alert('导出失败：' + err.message);
+  } finally {
+    setTimeout(() => { btn.textContent = oldText; btn.disabled = false; }, 1500);
+  }
+}
+
+// ── 年号输入 ─────────────────────────────────────────────────
+
+let _eraDynasties = null;
+
+/** 初始化年号输入：加载 CSV，填充朝代下拉 */
+async function initEraInput() {
+  const info = qs('#era-info');
+  info.textContent = '从年号表载入中…（首次加载约 1MB）';
+  try {
+    _eraDynasties = await getDynastyList();
+    state.eraDataReady = true;
+
+    const selDyn = qs('#sel-era-dynasty');
+    selDyn.innerHTML = _eraDynasties.map(d => `<option value="${d}">${d}</option>`).join('');
+    // 默认选「清」
+    const defaultDyn = _eraDynasties.includes('清') ? '清' : _eraDynasties[0];
+    selDyn.value = defaultDyn;
+    await refreshEraNames();
+
+    info.textContent = `已载入 ${_eraDynasties.length} 个朝代的年号数据`;
+  } catch (err) {
+    console.error(err);
+    info.textContent = '年号数据加载失败：' + err.message;
+  }
+}
+
+/** 刷新年号下拉（朝代变化后） */
+async function refreshEraNames() {
+  const dyn = qs('#sel-era-dynasty').value;
+  const eras = await getErasByDynasty(dyn);
+  const selEra = qs('#sel-era-name');
+  selEra.innerHTML = eras.map(e =>
+    `<option value="${e.eraName}">${e.eraName}（${e.emperor}）${e.yearMin}~${e.yearMax}</option>`
+  ).join('');
+  if (eras.length > 0) {
+    selEra.value = eras[0].eraName;
+    qs('#input-era-year').value = eras[0].yearMin;
+    qs('#input-era-year').min = eras[0].yearMin;
+    qs('#input-era-year').max = eras[0].yearMax;
+    updateEraYearHint();
+  }
+}
+
+/** 年次年次提示 */
+function updateEraYearHint() {
+  const dyn = qs('#sel-era-dynasty').value;
+  const era = qs('#sel-era-name').value;
+  getErasByDynasty(dyn).then(eras => {
+    const found = eras.find(e => e.eraName === era);
+    if (found) {
+      qs('#era-year-hint').textContent = `年（${found.yearMin}~${found.yearMax}，干支起 ${found.ganzhiStart}）`;
+      qs('#input-era-year').min = found.yearMin;
+      qs('#input-era-year').max = found.yearMax;
+    }
+  });
+}
+
+/** 应用年号 → 设置 state.year/era，并同步数字纪年面板 */
+async function applyEra() {
+  const dyn = qs('#sel-era-dynasty').value;
+  const era = qs('#sel-era-name').value;
+  const eraYear = parseInt(qs('#input-era-year').value, 10);
+  const info = qs('#era-info');
+
+  const result = await lookupEra(dyn, era, eraYear);
+  if (!result) {
+    info.textContent = `未找到「${dyn}·${era}」第 ${eraYear} 年的记录`;
+    return;
+  }
+  const { era: eraTag, year } = astroToState(result.astroYear);
+  state.era = eraTag;
+  state.year = year;
+
+  // 同步到数字纪年面板
+  setSegment('#seg-era', eraTag);
+  qs('#input-year').value = year;
+  refreshDayOptions();
+  updateDatePreview();
+
+  const display = result.astroYear > 0
+    ? `公元 ${result.astroYear} 年`
+    : `公元前 ${1 - result.astroYear} 年`;
+  info.textContent = `「${dyn}·${era}」${eraYear}年 → ${display}（干支 ${result.ganzhi}）`;
 }
 
 // ── 对比栏 ──────────────────────────────────────────────────

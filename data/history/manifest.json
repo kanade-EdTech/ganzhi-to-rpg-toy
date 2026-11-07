@@ -1,0 +1,36 @@
+{
+  "downloaded_on": "2026-11-07",
+  "dila_source": "https://authority.dila.edu.tw/downloads/authority_time_chinese.2012-02.zip",
+  "dila_license": "CC BY-SA 3.0 Unported, per archive README/COPYING",
+  "cejs_source": "https://github.com/kanasimi/CeJS/blob/master/data/date/era_data.js",
+  "cejs_blob_sha": "9b64e74e361f72beab78849f6b4a105ce99fac26",
+  "cejs_license": "BSD-3-Clause",
+  "raw_table_counts": {
+    "c_languages": 19,
+    "t_day_comments": 57,
+    "t_dynasty": 102,
+    "t_dynasty_comments": 35,
+    "t_dynasty_names": 107,
+    "t_emperor": 387,
+    "t_emperor_comments": 0,
+    "t_emperor_names": 403,
+    "t_era": 932,
+    "t_era_comments": 0,
+    "t_era_names": 1074,
+    "t_month": 56327,
+    "t_month_comments": 0
+  },
+  "era_records": 932,
+  "era_year_records": 5178,
+  "standard_year_records": 4786,
+  "supplementary_chronology_records": 1481,
+  "supplementary_era_records": 968,
+  "supplementary_year_records": 5285,
+  "supplementary_eras_requiring_review": 13,
+  "source_coverage_note": "Source-specific records overlap. Reused eras, extensions, uncertain records and pre-era ruler chronologies are retained. These sources do not establish exhaustive coverage of every Chinese era.",
+  "files_sha256": {
+    "sources/dila/authority_time_chinese/authority_time_chinese.sql": "423bd0b2126011275c354307cf5416a3952e23f3a88f017f97b2c11ca36d5974",
+    "sources/dila_chinese.zip": "53937ef60dbe8061a2e56aa8ef2feaaa08a1fa4d1a62a117a4b9932046f55530",
+    "sources/cejs_era_data.js": "75f80339a76b88a4b45e759f9ed07171bc3a0926b0f718c8410149be81456a5f"
+  }
+}

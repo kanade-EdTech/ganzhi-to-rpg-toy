@@ -580,6 +580,11 @@ select option { background: #1C1E24; }
 }
 #footer-section .btn { flex: 1; min-width: 140px; font-size: 0.82rem; justify-content: center; padding: 9px 12px; }
 
+/* ── 年号输入 ────────────────────────────────────────────── */
+#row-year-era .form-row { margin-bottom: 8px; }
+#sel-era-dynasty, #sel-era-name { font-size: 0.82rem; }
+#era-info { margin-top: 6px; }
+
 /* ── 互转预览提示 ────────────────────────────────────────── */
 .lunar-preview {
   font-size: 0.7rem;
@@ -625,6 +630,7 @@ select option { background: #1C1E24; }
 
 /* ── Tooltip ────────────────────────────────────────────── */
 .tooltip {
+  white-space: pre-line;
   position: fixed;
   z-index: 1000;
   background: rgba(20,22,28,0.97);
@@ -639,6 +645,9 @@ select option { background: #1C1E24; }
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   display: none;
 }
+
+.pillar-benqi { display: block; font-size: 0.65rem; line-height: 1.5; }
+.banner-info, .compare-slot { min-width: 0; overflow-wrap: anywhere; }
 .tooltip.show { display: block; }
 
 /* ── 对比栏 ─────────────────────────────────────────────── */

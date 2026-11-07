@@ -125,11 +125,11 @@ export function calcWeights(bazi) {
       details.push({ pillar: cfg.pillar, pos: `地支${dzKey}(本气)`, char: TIANGAN[benqi.tg], shishen: benqiSS, wuxing: benqiWx, score: benqiScore, changsheng: pillar.changsheng });
 
       // 藏干加成（≤主柱1/3）
-      const maxCangScore = cfg.dzW / 3;
+      const maxCangScore = cfg.dzW * cs / 3;
       if (cangganList.length >= 2) {
         // 双气：中气占25%
         const zhongqi = cangganList[1];
-        const zhongqiScore = Math.min(cfg.dzW * 0.25, maxCangScore);
+        const zhongqiScore = Math.min(cfg.dzW * cs * (cangganList.length === 3 ? 2/9 : 1/4), maxCangScore);
         const zhongqiSS = calcShishen(dm, zhongqi.tg);
         const zhongqiWx = TG_WUXING[zhongqi.tg];
         scores[zhongqiSS] += zhongqiScore;
@@ -139,7 +139,7 @@ export function calcWeights(bazi) {
       if (cangganList.length >= 3) {
         // 三气：余气占1/9
         const yuqi = cangganList[2];
-        const yuqiScore = Math.min(cfg.dzW * (1/9), maxCangScore * (1/3));
+        const yuqiScore = Math.min(cfg.dzW * cs * (1/9), maxCangScore * (1/3));
         const yuqiSS = calcShishen(dm, yuqi.tg);
         const yuqiWx = TG_WUXING[yuqi.tg];
         scores[yuqiSS] += yuqiScore;
@@ -195,8 +195,8 @@ export function calcRPGStats(shishenScores) {
   const qs = S['七杀'] || 0;
   stats['七杀'] = {
     value: (0.1 + qs * 0.035).toFixed(3),
-    maxBuff: (qs * 1.8).toFixed(1),
-    display: `每损1%生命 +${(0.1 + qs * 0.035).toFixed(3)}%终伤 (极限+${(qs * 1.8).toFixed(1)}%)`,
+    maxBuff: ((0.1 + qs * 0.035) * 100).toFixed(1),
+    display: `每损1%生命 +${(0.1 + qs * 0.035).toFixed(3)}%终伤 (极限+${((0.1 + qs * 0.035) * 100).toFixed(1)}%)`,
     raw: qs,
   };
 
