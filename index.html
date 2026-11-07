@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>生辰造化 · 天干地支先天 RPG 数值推演器</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔮</text></svg>">
+  <!-- 思源宋体 (Google Fonts CDN) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <header id="app-header"></header>
+  <main id="app-main">
+    <aside id="panel-left"></aside>
+    <section id="panel-right"></section>
+  </main>
+
+  <script type="module">
+    import { initUI } from './src/ui.js';
+    initUI();
+  </script>
+</body>
+</html>

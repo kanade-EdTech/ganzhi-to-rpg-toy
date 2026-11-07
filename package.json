@@ -1,0 +1,12 @@
+{
+  "name": "ganzhi-to-rpg-toy",
+  "version": "1.0.0",
+  "description": "生辰造化 · 天干地支先天 RPG 数值推演器",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve . -l 5173",
+    "start": "npx serve ."
+  },
+  "keywords": ["ganzhi", "bazi", "rpg", "chinese", "fate"],
+  "license": "MIT"
+}
