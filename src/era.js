@@ -9,9 +9,9 @@ const CSV_URL = 'data/history/all-era-years.csv';
 // 来源优先级：越小越优
 const SOURCE_PRIORITY = {
   'DILA,S': 0,
-  'DILA,P': 1,
-  'CeJS,derived': 2,
-  'CeJS,準=年': 2,
+  'DILA,P': 2,
+  'CeJS,derived': 1,
+  'CeJS,準=年': 1,
   'CeJS,疑': 3,
   'DILA,疑': 3,
 };
@@ -68,7 +68,7 @@ export async function loadEraData() {
       const rec = parseLine(line);
       if (!rec || !rec.dynasty || !rec.eraName || isNaN(rec.eraYear) || isNaN(rec.astroYear)) continue;
 
-      const key = `${rec.dynasty}\u0001${rec.eraName}`;
+      const key = `${rec.dynasty}\u0001${rec.eraName}\u0001${rec.emperor}`;
       const arr = _index.get(key);
       if (arr) {
         // 同 (dynasty, eraName, eraYear) 优先保留高优先级来源
@@ -94,7 +94,11 @@ export async function loadEraData() {
     _loaded = true;
     _loading = null;
   })();
-  return _loading;
+  try {
+    return await _loading;
+  } finally {
+    _loading = null;
+  }
 }
 
 /**
@@ -113,12 +117,13 @@ export async function getErasByDynasty(dynasty) {
   await loadEraData();
   const result = [];
   for (const [key, arr] of _index) {
-    const [dyn, eraName] = key.split('\u0001');
+    const [dyn, eraName, emperorName] = key.split('\u0001');
     if (dyn !== dynasty) continue;
     const years = arr.map(e => e.eraYear).sort((a, b) => a - b);
     const emperor = arr[0]?.emperor || '';
     result.push({
       eraName,
+      id: `${eraName}\u0001${emperorName}`,
       emperor,
       yearMin: years[0],
       yearMax: years[years.length - 1],
@@ -136,8 +141,12 @@ export async function getErasByDynasty(dynasty) {
 export async function lookupEra(dynasty, eraName, eraYear) {
   await loadEraData();
   const key = `${dynasty}\u0001${eraName}`;
-  const arr = _index.get(key);
-  if (!arr) return null;
+  let arr = _index.get(key);
+  if (!arr) {
+    const matches = [..._index.entries()].filter(([entryKey]) => entryKey.startsWith(`${key}\u0001`));
+    if (matches.length !== 1) return null;
+    arr = matches[0][1];
+  }
   const found = arr.find(e => e.eraYear === eraYear);
   if (!found) return null;
   return {

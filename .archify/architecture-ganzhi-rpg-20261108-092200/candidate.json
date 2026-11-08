@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "生辰造化 RPG 引擎系统架构",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-ganzhi-rpg-20261108-092200/ganzhi-rpg-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/kanade-EdTech/ganzhi-to-rpg-toy.git",
+      "revision": "cf883b855b42aefec8903c1d1c1081f4f864f8b6",
+      "provider": "github",
+      "link_mode": "web"
+    },
+    "views": [
+      {
+        "id": "view_input",
+        "label": "生辰与历法输入",
+        "focus": ["user", "ui_input", "era_engine", "era_data"],
+        "note": "涵盖公历、农历、十二时辰及 -5000～+5000 历史年号连续推演输入体系"
+      },
+      {
+        "id": "view_calc",
+        "label": "排盘与数值计算内核",
+        "focus": ["lunar_lib", "bazi_engine", "weights_engine", "rpg_stats", "title_grader"],
+        "note": "实现四柱提取、地支藏干分层权重计算、十神数值映射与命格评级"
+      },
+      {
+        "id": "view_output",
+        "label": "命格卡展现与导出",
+        "focus": ["card_ui", "export_serv"],
+        "note": "国风角色命格卷轴展示、五行属性雷达图以及 PNG 与 Markdown 导出分享"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户 / 设定作者",
+      "sublabel": "输入生辰或历史年号",
+      "icon": "person",
+      "pos": [40, 50],
+      "size": [130, 65]
+    },
+    {
+      "id": "ui_input",
+      "type": "frontend",
+      "label": "生辰输入控制器",
+      "sublabel": "双解耦输入与早晚子时",
+      "icon": "calendar",
+      "sources": [
+        { "path": "src/ui.js", "line": 142, "end_line": 270, "label": "buildLeftPanel" },
+        { "path": "src/ui.js", "line": 590, "end_line": 617, "label": "doCalc" }
+      ],
+      "pos": [280, 50],
+      "size": [160, 65]
+    },
+    {
+      "id": "era_engine",
+      "type": "backend",
+      "label": "纪年历法扩展引擎",
+      "sublabel": "万年年号检索与连续推演",
+      "icon": "clock",
+      "sources": [
+        { "path": "src/era.js", "line": 51, "end_line": 100, "label": "loadEraData" },
+        { "path": "src/era.js", "line": 136, "end_line": 155, "label": "lookupEra" }
+      ],
+      "pos": [560, 50],
+      "size": [160, 65]
+    },
+    {
+      "id": "era_data",
+      "type": "database",
+      "label": "历史年号数据集",
+      "sublabel": "DILA + CeJS 纪年 CSV",
+      "icon": "database",
+      "sources": [
+        { "path": "src/era.js", "line": 7, "end_line": 17, "label": "CSV_URL & Priority" },
+        { "path": "data/history/all-era-years.csv", "line": 1, "end_line": 10, "label": "all-era-years.csv" }
+      ],
+      "pos": [840, 50],
+      "size": [160, 65]
+    },
+    {
+      "id": "lunar_lib",
+      "type": "backend",
+      "label": "天文星历库 (Lunar)",
+      "sublabel": "精准节气交节与朔望月",
+      "icon": "moon",
+      "sources": [
+        { "path": "src/ganzhi.js", "line": 1, "end_line": 2, "label": "Solar & Lunar Import" },
+        { "path": "src/vendor/lunar.js", "line": 1, "end_line": 20, "label": "lunar-javascript" }
+      ],
+      "pos": [40, 190],
+      "size": [130, 65]
+    },
+    {
+      "id": "bazi_engine",
+      "type": "backend",
+      "label": "四柱八字排盘引擎",
+      "sublabel": "四柱干支 / 藏干 / 十二长生",
+      "icon": "backend",
+      "sources": [
+        { "path": "src/ganzhi.js", "line": 83, "end_line": 108, "label": "calcBazi" }
+      ],
+      "pos": [280, 190],
+      "size": [160, 65]
+    },
+    {
+      "id": "weights_engine",
+      "type": "backend",
+      "label": "五行与十神权重结算",
+      "sublabel": "月令提纲与藏干分层权重",
+      "icon": "backend",
+      "sources": [
+        { "path": "src/rpg.js", "line": 87, "end_line": 158, "label": "calcWeights" }
+      ],
+      "pos": [560, 190],
+      "size": [160, 65]
+    },
+    {
+      "id": "rpg_stats",
+      "type": "backend",
+      "label": "RPG 属性数值映射",
+      "sublabel": "生命/吸血/CDR等十神词条",
+      "icon": "backend",
+      "sources": [
+        { "path": "src/rpg.js", "line": 165, "end_line": 253, "label": "calcRPGStats" }
+      ],
+      "pos": [840, 190],
+      "size": [160, 65]
+    },
+    {
+      "id": "title_grader",
+      "type": "backend",
+      "label": "命格称号与灵根评级",
+      "sublabel": "单神独旺 / 双神联动 / SSR",
+      "icon": "flag",
+      "sources": [
+        { "path": "src/rpg.js", "line": 257, "end_line": 321, "label": "calcTitle" },
+        { "path": "src/rpg.js", "line": 324, "end_line": 336, "label": "calcGrade" }
+      ],
+      "pos": [840, 330],
+      "size": [160, 65]
+    },
+    {
+      "id": "card_ui",
+      "type": "frontend",
+      "label": "命格卡与雷达图渲染",
+      "sublabel": "国风古卷铭牌与五行雷达",
+      "icon": "frontend",
+      "sources": [
+        { "path": "src/ui.js", "line": 621, "end_line": 632, "label": "renderResult" },
+        { "path": "src/ui.js", "line": 636, "end_line": 680, "label": "renderBanner" }
+      ],
+      "pos": [560, 330],
+      "size": [160, 65]
+    },
+    {
+      "id": "export_serv",
+      "type": "frontend",
+      "label": "导出与角色对比服务",
+      "sublabel": "PNG图片生成与双命格对比",
+      "icon": "frontend",
+      "sources": [
+        { "path": "src/ui.js", "line": 890, "end_line": 915, "label": "copyMarkdown" },
+        { "path": "src/ui.js", "line": 922, "end_line": 960, "label": "exportImage" }
+      ],
+      "pos": [280, 330],
+      "size": [160, 65]
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_user_input",
+      "from": "user",
+      "to": "ui_input",
+      "label": "设定生辰时辰",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn_data_engine",
+      "from": "era_data",
+      "to": "era_engine",
+      "label": "加载CSV年号表",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "conn_engine_input",
+      "from": "era_engine",
+      "to": "ui_input",
+      "label": "换算公历与干支",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "conn_input_bazi",
+      "from": "ui_input",
+      "to": "bazi_engine",
+      "label": "排盘参数请求",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "conn_lunar_bazi",
+      "from": "lunar_lib",
+      "to": "bazi_engine",
+      "label": "节气与朔望月",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn_bazi_weights",
+      "from": "bazi_engine",
+      "to": "weights_engine",
+      "label": "四柱与藏干长生",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn_weights_stats",
+      "from": "weights_engine",
+      "to": "rpg_stats",
+      "label": "五行与十神积分",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn_stats_title",
+      "from": "rpg_stats",
+      "to": "title_grader",
+      "label": "进阶数值与词条",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "conn_weights_card",
+      "from": "weights_engine",
+      "to": "card_ui",
+      "label": "五行能量雷达图",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "conn_title_card",
+      "from": "title_grader",
+      "to": "card_ui",
+      "label": "命格称号与灵根",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "conn_card_export",
+      "from": "card_ui",
+      "to": "export_serv",
+      "label": "卡片DOM快照",
+      "fromSide": "left",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "生辰输入与历法支持",
+      "items": [
+        "双解耦生辰模式：支持公历/农历与24小时制/十二时辰自由组合",
+        "历史年号万年历：集成 DILA/CeJS 年号数据，支持 -5000～+5000 年任意生辰推算",
+        "早晚子时精准分化：支持子时换日与五鼠遁时柱连续推演"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "排盘与数值结算内核",
+      "items": [
+        "四柱干支与藏干：精确交节、月令提纲权重、地支中气/余气分层加成",
+        "十二长生状态：日主在各地支气势乘数，动态调节干支能量",
+        "十神映射与属性生成：将同我/克我/生我转化为生命、吸血、CDR、终伤等RPG属性"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "命格卡呈现与导出",
+      "items": [
+        "五行能量雷达图：直观量化金木水火土五维底盘与元素亲和",
+        "命格称号与灵根：单神独旺（如天命欧皇）与双神联动（如镇狱剑仙）及SSR评级",
+        "一键保存与对比：基于 HTML 绘制国风卷轴卡片，支持图片导出与双角色数值对比"
+      ]
+    }
+  ]
+}

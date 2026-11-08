@@ -933,6 +933,7 @@ async function exportImage() {
   const stats = qs('#stats-section').closest('.card');
   const blocks = [target, top3, stats].filter(Boolean);
 
+  let wrap;
   try {
     if (typeof html2canvas === 'undefined') {
       throw new Error('html2canvas 未加载，请检查网络');
@@ -944,12 +945,16 @@ async function exportImage() {
     }
 
     // 拼接几张卡片到一个临时容器，便于一次性截图
-    const wrap = document.createElement('div');
+    wrap = document.createElement('div');
     wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:760px;padding:24px;background:#121316;display:flex;flex-direction:column;gap:16px;';
     blocks.forEach(b => {
       const clone = b.cloneNode(true);
       // 移除可能的 hover 高亮
       clone.classList.remove('highlight','highlighted');
+      [clone, ...clone.querySelectorAll('*')].forEach(el => {
+        el.style.animation = 'none';
+        el.style.transition = 'none';
+      });
       wrap.appendChild(clone);
     });
     document.body.appendChild(wrap);
@@ -973,6 +978,7 @@ async function exportImage() {
     console.error(err);
     alert('导出失败：' + err.message);
   } finally {
+    wrap?.remove();
     setTimeout(() => { btn.textContent = oldText; btn.disabled = false; }, 1500);
   }
 }
@@ -1009,10 +1015,10 @@ async function refreshEraNames() {
   const eras = await getErasByDynasty(dyn);
   const selEra = qs('#sel-era-name');
   selEra.innerHTML = eras.map(e =>
-    `<option value="${e.eraName}">${e.eraName}（${e.emperor}）${e.yearMin}~${e.yearMax}</option>`
+    `<option value="${escapeHTML(e.id)}">${e.eraName}（${e.emperor}）${e.yearMin}~${e.yearMax}</option>`
   ).join('');
   if (eras.length > 0) {
-    selEra.value = eras[0].eraName;
+    selEra.value = eras[0].id;
     qs('#input-era-year').value = eras[0].yearMin;
     qs('#input-era-year').min = eras[0].yearMin;
     qs('#input-era-year').max = eras[0].yearMax;
@@ -1025,7 +1031,7 @@ function updateEraYearHint() {
   const dyn = qs('#sel-era-dynasty').value;
   const era = qs('#sel-era-name').value;
   getErasByDynasty(dyn).then(eras => {
-    const found = eras.find(e => e.eraName === era);
+    const found = eras.find(e => e.id === era);
     if (found) {
       qs('#era-year-hint').textContent = `年（${found.yearMin}~${found.yearMax}，干支起 ${found.ganzhiStart}）`;
       qs('#input-era-year').min = found.yearMin;
@@ -1038,12 +1044,14 @@ function updateEraYearHint() {
 async function applyEra() {
   const dyn = qs('#sel-era-dynasty').value;
   const era = qs('#sel-era-name').value;
-  const eraYear = parseInt(qs('#input-era-year').value, 10);
+  const yearInput = qs('#input-era-year');
+  if (!yearInput.reportValidity()) return;
+  const eraYear = Number(yearInput.value);
   const info = qs('#era-info');
 
   const result = await lookupEra(dyn, era, eraYear);
   if (!result) {
-    info.textContent = `未找到「${dyn}·${era}」第 ${eraYear} 年的记录`;
+    info.textContent = `未找到「${dyn}·${era.split('\u0001')[0]}」第 ${eraYear} 年的记录`;
     return;
   }
   const { era: eraTag, year } = astroToState(result.astroYear);
@@ -1059,7 +1067,7 @@ async function applyEra() {
   const display = result.astroYear > 0
     ? `公元 ${result.astroYear} 年`
     : `公元前 ${1 - result.astroYear} 年`;
-  info.textContent = `「${dyn}·${era}」${eraYear}年 → ${display}（干支 ${result.ganzhi}）`;
+  info.textContent = `「${dyn}·${era.split('\u0001')[0]}」${eraYear}年 → ${display}（干支 ${result.ganzhi}）`;
 }
 
 // ── 对比栏 ──────────────────────────────────────────────────

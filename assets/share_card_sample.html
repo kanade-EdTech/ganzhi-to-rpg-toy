@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>生辰造化 · 角色命格导出分享样图</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 md:p-6">
+  <div class="max-w-5xl mx-auto space-y-5">
+    <!-- 顶部控制栏 -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 class="text-lg font-semibold text-[var(--foreground)]">生辰造化 · 导出分享长图样图 (Canvas 渲染)</h1>
+        <p class="text-xs text-[var(--muted-foreground)] mt-0.5">
+          遵循「±5000年万年历」与「藏干藏支加成 ≤ 主柱 1/3」规则，点击下方预设可切换不同时代的 OC 命格分享卡样图。
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btn-preset-0" onclick="selectPreset(0)" class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all">
+          🔥 盛唐剑仙 (AD 712)
+        </button>
+        <button id="btn-preset-1" onclick="selectPreset(1)" class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all">
+          🌊 上古神女 (BC 2697)
+        </button>
+        <button id="btn-preset-2" onclick="selectPreset(2)" class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all">
+          ⚡ 赛博诡道 (AD 3588)
+        </button>
+        <button onclick="downloadPoster()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90 transition-opacity shadow-sm">
+          📥 下载 PNG 样图
+        </button>
+      </div>
+    </div>
+
+    <!-- 画布展示区 -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 md:p-6 shadow-sm flex flex-col items-center">
+      <div class="w-full max-w-[780px] overflow-hidden rounded-lg shadow-2xl border border-[#C8A96B]/40">
+        <canvas id="shareCanvas" width="960" height="1320" class="w-full h-auto block"></canvas>
+      </div>
+      <p class="text-xs text-[var(--muted-foreground)] mt-3">
+        提示：上方样图由原生 HTML5 <code>&lt;canvas&gt;</code> 实时绘制（分辨率 960×1320），可直接右键另存为图片或点击右上角按钮下载。
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // 五行配色表（东方玄学罗盘 × 暗金国潮配色）
+    const WUXING_COLORS = {
+      '木': { main: '#4CAF7A', bg: 'rgba(76, 175, 122, 0.16)', border: '#4CAF7A', label: '木·生机' },
+      '火': { main: '#E85D4E', bg: 'rgba(232, 93, 78, 0.16)', border: '#E85D4E', label: '火·爆发' },
+      '土': { main: '#E0A84E', bg: 'rgba(224, 168, 78, 0.16)', border: '#E0A84E', label: '土·坚韧' },
+      '金': { main: '#F2C94C', bg: 'rgba(242, 201, 76, 0.16)', border: '#F2C94C', label: '金·锋芒' },
+      '水': { main: '#4A98E8', bg: 'rgba(74, 152, 232, 0.16)', border: '#4A98E8', label: '水·灵动' }
+    };
+
+    // 品阶配色
+    const TIER_COLORS = {
+      '仙品': { color: '#FFB800', bg: 'rgba(255, 184, 0, 0.18)', border: '#FFB800' },
+      '极品': { color: '#C066E8', bg: 'rgba(192, 102, 232, 0.18)', border: '#C066E8' },
+      '珍品': { color: '#4A98E8', bg: 'rgba(74, 152, 232, 0.18)', border: '#4A98E8' },
+      '良品': { color: '#4CAF7A', bg: 'rgba(76, 175, 122, 0.15)', border: '#4CAF7A' },
+      '凡品': { color: '#8E9299', bg: 'rgba(142, 146, 153, 0.12)', border: '#5A5E66' }
+    };
+
+    // 三套跨万年 OC 预设数据（严格遵循藏干藏支 ≤ 主柱 1/3 规则）
+    const PRESETS = [
+      {
+        name: '裴烬霄',
+        gender: '乾造 · 男',
+        eraTag: '盛唐开元 · 公元 712 年',
+        dateDesc: '【农历】壬子年 八月十五  |  【传统时辰】午时 (11:00-13:00)',
+        subDateDesc: '对应公历：公元 712 年 09 月 19 日 12:00 (万年历距今 -1314 年)',
+        dayMaster: '丙火',
+        dayMasterElement: '火',
+        dayMasterDesc: '阳火之体 · 烈日悬空',
+        rating: 'SSR · 先天道体',
+        title: '【 傲世破法狂儒 · 伤官制杀格 】',
+        poem: '“食伤泄秀兼制杀，残血挥剑破万法。兼具恐怖的技能伤害倍率与绝境反杀能力。”',
+        buildTags: ['极致法暴流', '残血修罗', '高爆寻宝'],
+        pillars: [
+          {
+            pos: '年柱 · 根基',
+            mainWeight: '16.0',
+            hiddenCap: '+4.0 (≤1/3)',
+            stem: '壬', stemEl: '水', stemGod: '七杀', stemPts: '8.0',
+            branch: '子', branchEl: '水', branchAnimal: '鼠', branchGod: '正官(癸)', branchPts: '8.0',
+            hiddens: [
+              { text: '独气纯水 · 专精 +1.6', god: '正官' }
+            ],
+            stage: '胎 (1.00x)'
+          },
+          {
+            pos: '月柱 · 提纲',
+            mainWeight: '36.0',
+            hiddenCap: '+9.0 (≤1/3)',
+            stem: '己', stemEl: '土', stemGod: '伤官', stemPts: '12.0',
+            branch: '酉', branchEl: '金', branchAnimal: '鸡', branchGod: '正财(辛)', branchPts: '24.0',
+            hiddens: [
+              { text: '独气纯金 · 专精 +3.6', god: '正财' }
+            ],
+            stage: '死 (0.90x)'
+          },
+          {
+            pos: '日柱 · 元神',
+            mainWeight: '24.0',
+            hiddenCap: '+8.0 (≤1/3)',
+            stem: '丙', stemEl: '火', stemGod: '日主/元神', stemPts: '8.0',
+            branch: '寅', branchEl: '木', branchAnimal: '虎', branchGod: '偏印(甲)', branchPts: '16.0',
+            hiddens: [
+              { text: '丙·比肩 +5.3', god: '比肩' },
+              { text: '戊·食神 +2.7', god: '食神' }
+            ],
+            stage: '长生 (1.15x)'
+          },
+          {
+            pos: '时柱 · 归宿',
+            mainWeight: '24.0',
+            hiddenCap: '+6.0 (≤1/3)',
+            stem: '甲', stemEl: '木', stemGod: '偏印', stemPts: '12.0',
+            branch: '午', branchEl: '火', branchAnimal: '马', branchGod: '劫财(丁)', branchPts: '12.0',
+            hiddens: [
+              { text: '己·伤官 +6.0', god: '伤官' }
+            ],
+            stage: '帝旺 (1.25x)'
+          }
+        ],
+        topTalents: [
+          { god: '伤官', stat: '技能伤害', val: '+48.5%', tier: '仙品', src: '月干[己]透出 + 时支[午]藏干 + 帝旺增幅' },
+          { god: '偏印', stat: '技能冷却缩减', val: '+34.2%', tier: '极品', src: '日支[寅]本气 + 时干[甲]透出 + 长生加持' },
+          { god: '正财', stat: '金币/基础掉率', val: '+62.0%', tier: '极品', src: '月令[酉]提纲独气本柱 (24.0点)' }
+        ],
+        allStats: [
+          { group: '体魄与生存', god: '比肩', name: '生命上限', valText: '2,180 (+21.0%)', ratio: 0.48, tier: '珍品', pts: '15.3点' },
+          { group: '体魄与生存', god: '劫财', name: '生命偷取', valText: '+14.8% 全能吸血', ratio: 0.52, tier: '珍品', pts: '15.0点' },
+          { group: '威压与狂暴', god: '正官', name: '控制命中', valText: '+18.2% 控制命中', ratio: 0.36, tier: '良品', pts: '9.6点' },
+          { group: '威压与狂暴', god: '七杀', name: '卖血增益', valText: '每损1%血 +0.68%终伤', ratio: 0.58, tier: '珍品', pts: '12.0点' },
+          { group: '灵力与才华', god: '食神', name: '法力回复', valText: '11.4 点/秒 (+18%)', ratio: 0.25, tier: '良品', pts: '3.1点' },
+          { group: '灵力与才华', god: '伤官', name: '技能伤害', valText: '+48.5% [★本命极值]', ratio: 0.92, tier: '仙品', pts: '38.8点' },
+          { group: '悟性与奇术', god: '正印', name: '经验加成', valText: '+6.0% 境界突破', ratio: 0.14, tier: '凡品', pts: '4.0点' },
+          { group: '悟性与奇术', god: '偏印', name: '技能冷却缩减', valText: '+34.2% 极速连招', ratio: 0.82, tier: '极品', pts: '33.4点' },
+          { group: '气运与财源', god: '正财', name: '金币/基础掉率', valText: '+62.0% 财源滚滚', ratio: 0.78, tier: '极品', pts: '24.8点' },
+          { group: '气运与财源', god: '偏财', name: '高级珍宝掉落', valText: '+12.5% 奇珍寻获', ratio: 0.28, tier: '良品', pts: '8.5点' }
+        ],
+        wuxing: [
+          { el: '木', pct: 26 },
+          { el: '火', pct: 24 },
+          { el: '土', pct: 16 },
+          { el: '金', pct: 20 },
+          { el: '水', pct: 14 }
+        ]
+      },
+      {
+        name: '云华瑶姬',
+        gender: '坤造 · 女',
+        eraTag: '上古洪荒 · 公元前 2697 年',
+        dateDesc: '【公历】公元前 2697 年 03 月 21 日  |  【现代时间】00:15 (早子时)',
+        subDateDesc: '对应农历：黄帝元年 甲子年 二月十五 子时 (万年历距今 -4723 年)',
+        dayMaster: '癸水',
+        dayMasterElement: '水',
+        dayMasterDesc: '阴水之体 · 玄冥甘露',
+        rating: 'UR · 混沌仙胎',
+        title: '【 逍遥灵泉仙 · 食神生财格 】',
+        poem: '“泽润万物，灵泉不竭。拥有无双的法力续航与天命奇珍掉率，乃天地钟爱的气运仙子。”',
+        buildTags: ['永动法神', '天命欧皇', '团队灵泉'],
+        pillars: [
+          {
+            pos: '年柱 · 根基',
+            mainWeight: '16.0',
+            hiddenCap: '+0.0 (≤1/3)',
+            stem: '甲', stemEl: '木', stemGod: '伤官', stemPts: '8.0',
+            branch: '子', branchEl: '水', branchAnimal: '鼠', branchGod: '比肩(癸)', branchPts: '8.0',
+            hiddens: [
+              { text: '独气纯水 · 专精 +1.6', god: '比肩' }
+            ],
+            stage: '临官 (1.20x)'
+          },
+          {
+            pos: '月柱 · 提纲',
+            mainWeight: '36.0',
+            hiddenCap: '+0.0 (≤1/3)',
+            stem: '丁', stemEl: '火', stemGod: '偏财', stemPts: '12.0',
+            branch: '卯', branchEl: '木', branchAnimal: '兔', branchGod: '食神(乙)', branchPts: '24.0',
+            hiddens: [
+              { text: '独气纯木 · 专精 +3.6', god: '食神' }
+            ],
+            stage: '长生 (1.15x)'
+          },
+          {
+            pos: '日柱 · 元神',
+            mainWeight: '24.0',
+            hiddenCap: '+8.0 (≤1/3)',
+            stem: '癸', stemEl: '水', stemGod: '日主/元神', stemPts: '8.0',
+            branch: '巳', branchEl: '火', branchAnimal: '蛇', branchGod: '正财(丙)', branchPts: '16.0',
+            hiddens: [
+              { text: '庚·正印 +5.3', god: '正印' },
+              { text: '戊·正官 +2.7', god: '正官' }
+            ],
+            stage: '胎 (1.00x)'
+          },
+          {
+            pos: '时柱 · 归宿',
+            mainWeight: '24.0',
+            hiddenCap: '+0.0 (≤1/3)',
+            stem: '壬', stemEl: '水', stemGod: '劫财', stemPts: '12.0',
+            branch: '子', branchEl: '水', branchAnimal: '鼠', branchGod: '比肩(癸)', branchPts: '12.0',
+            hiddens: [
+              { text: '独气纯水 · 专精 +2.4', god: '比肩' }
+            ],
+            stage: '临官 (1.20x)'
+          }
+        ],
+        topTalents: [
+          { god: '食神', stat: '法力回复', val: '38.6 点/秒 (+78%)', tier: '仙品', src: '月令[卯]提纲独气 + 长生状态加持' },
+          { god: '比肩', stat: '生命上限', val: '3,420 (+42.5%)', tier: '仙品', src: '日主元神 + 年支[子] + 时支[子]双临官' },
+          { god: '偏财', stat: '高级珍宝掉落', val: '+46.8%', tier: '极品', src: '月干[丁]透出 + 食伤生财羁绊加成' }
+        ],
+        allStats: [
+          { group: '体魄与生存', god: '比肩', name: '生命上限', valText: '3,420 (+42.5%) [★极值]', ratio: 0.88, tier: '仙品', pts: '36.0点' },
+          { group: '体魄与生存', god: '劫财', name: '生命偷取', valText: '+12.2% 全能吸血', ratio: 0.45, tier: '珍品', pts: '14.4点' },
+          { group: '威压与狂暴', god: '正官', name: '控制命中', valText: '+11.5% 控制命中', ratio: 0.25, tier: '良品', pts: '2.7点' },
+          { group: '威压与狂暴', god: '七杀', name: '卖血增益', valText: '每损1%血 +0.15%终伤', ratio: 0.12, tier: '凡品', pts: '0.0点' },
+          { group: '灵力与才华', god: '食神', name: '法力回复', valText: '38.6 点/秒 [★本命极值]', ratio: 0.94, tier: '仙品', pts: '31.7点' },
+          { group: '灵力与才华', god: '伤官', name: '技能伤害', valText: '+22.0% 技能伤害', ratio: 0.46, tier: '珍品', pts: '9.6点' },
+          { group: '悟性与奇术', god: '正印', name: '经验加成', valText: '+18.5% 境界突破', ratio: 0.38, tier: '良品', pts: '5.3点' },
+          { group: '悟性与奇术', god: '偏印', name: '技能冷却缩减', valText: '+8.0% 冷却缩减', ratio: 0.20, tier: '凡品', pts: '0.0点' },
+          { group: '气运与财源', god: '正财', name: '金币/基础掉率', valText: '+54.0% 金币掉率', ratio: 0.68, tier: '珍品', pts: '16.0点' },
+          { group: '气运与财源', god: '偏财', name: '高级珍宝掉落', valText: '+46.8% [★欧皇气运]', ratio: 0.84, tier: '极品', pts: '28.0点' }
+        ],
+        wuxing: [
+          { el: '木', pct: 32 },
+          { el: '火', pct: 22 },
+          { el: '土', pct: 4 },
+          { el: '金', pct: 6 },
+          { el: '水', pct: 36 }
+        ]
+      },
+      {
+        name: '零号·玄机 (Zero-X)',
+        gender: '无相 · 义体OC',
+        eraTag: '赛博纪元 · 公元 3588 年',
+        dateDesc: '【农历】戊申年 闰七月廿二  |  【现代时间】23:42 (晚子时)',
+        subDateDesc: '对应公历：公元 3588 年 09 月 08 日 23:42 (万年历距今 +1562 年)',
+        dayMaster: '庚金',
+        dayMasterElement: '金',
+        dayMasterDesc: '阳金之体 · 太白剑锋',
+        rating: 'SSR · 机械飞升',
+        title: '【 浴血神皇 · 杀印相生格 】',
+        poem: '“钢筋铁骨铸元神，七杀焚身化神机。越是濒临绝境算力越狂暴，升级进化速度冠绝群伦。”',
+        buildTags: ['狂战坦克', '光速满级', '超频连招'],
+        pillars: [
+          {
+            pos: '年柱 · 根基',
+            mainWeight: '16.0',
+            hiddenCap: '+5.3 (≤1/3)',
+            stem: '戊', stemEl: '土', stemGod: '偏印', stemPts: '8.0',
+            branch: '申', branchEl: '金', branchAnimal: '猴', branchGod: '比肩(庚)', branchPts: '8.0',
+            hiddens: [
+              { text: '壬·食神 +3.6', god: '食神' },
+              { text: '戊·偏印 +1.8', god: '偏印' }
+            ],
+            stage: '临官 (1.20x)'
+          },
+          {
+            pos: '月柱 · 提纲',
+            mainWeight: '36.0',
+            hiddenCap: '+12.0 (≤1/3)',
+            stem: '丙', stemEl: '火', stemGod: '七杀', stemPts: '12.0',
+            branch: '申', branchEl: '金', branchAnimal: '猴', branchGod: '比肩(庚)', branchPts: '24.0',
+            hiddens: [
+              { text: '壬·食神 +8.0', god: '食神' },
+              { text: '戊·偏印 +4.0', god: '偏印' }
+            ],
+            stage: '临官 (1.20x)'
+          },
+          {
+            pos: '日柱 · 元神',
+            mainWeight: '24.0',
+            hiddenCap: '+8.0 (≤1/3)',
+            stem: '庚', stemEl: '金', stemGod: '日主/元神', stemPts: '8.0',
+            branch: '戌', branchEl: '土', branchAnimal: '狗', branchGod: '偏印(戊)', branchPts: '16.0',
+            hiddens: [
+              { text: '辛·劫财 +5.3', god: '劫财' },
+              { text: '丁·正官 +2.7', god: '正官' }
+            ],
+            stage: '衰 (1.00x)'
+          },
+          {
+            pos: '时柱 · 归宿',
+            mainWeight: '24.0',
+            hiddenCap: '+0.0 (≤1/3)',
+            stem: '丙', stemEl: '火', stemGod: '七杀', stemPts: '12.0',
+            branch: '子', branchEl: '水', branchAnimal: '鼠', branchGod: '伤官(癸)', branchPts: '12.0',
+            hiddens: [
+              { text: '独气纯水 · 专精 +2.4', god: '伤官' }
+            ],
+            stage: '死 (0.90x)'
+          }
+        ],
+        topTalents: [
+          { god: '比肩', stat: '生命上限', val: '3,850 (+49.0%)', tier: '仙品', src: '年支[申] + 月令[申]双临官建禄格' },
+          { god: '七杀', stat: '卖血增益', val: '每损1%血 +1.12%伤', tier: '仙品', src: '月干[丙] + 时干[丙]双透七杀夹日' },
+          { god: '偏印', stat: '技能冷却缩减', val: '+38.5%', tier: '极品', src: '年干[戊] + 日支[戌]本气 + 申中藏戊' }
+        ],
+        allStats: [
+          { group: '体魄与生存', god: '比肩', name: '生命上限', valText: '3,850 (+49.0%) [★极值]', ratio: 0.95, tier: '仙品', pts: '46.4点' },
+          { group: '体魄与生存', god: '劫财', name: '生命偷取', valText: '+7.5% 全能吸血', ratio: 0.28, tier: '良品', pts: '5.3点' },
+          { group: '威压与狂暴', god: '正官', name: '控制命中', valText: '+10.2% 控制命中', ratio: 0.22, tier: '良品', pts: '2.7点' },
+          { group: '威压与狂暴', god: '七杀', name: '卖血增益', valText: '残血最高 +112% 终伤', ratio: 0.90, tier: '仙品', pts: '26.4点' },
+          { group: '灵力与才华', god: '食神', name: '法力回复', valText: '18.2 点/秒 (+32%)', ratio: 0.45, tier: '珍品', pts: '11.6点' },
+          { group: '灵力与才华', god: '伤官', name: '技能伤害', valText: '+21.5% 技能伤害', ratio: 0.42, tier: '珍品', pts: '14.4点' },
+          { group: '悟性与奇术', god: '正印', name: '经验加成', valText: '+12.0% 境界突破', ratio: 0.24, tier: '良品', pts: '4.0点' },
+          { group: '悟性与奇术', god: '偏印', name: '技能冷却缩减', valText: '+38.5% [★超频核心]', ratio: 0.86, tier: '极品', pts: '29.8点' },
+          { group: '气运与财源', god: '正财', name: '金币/基础掉率', valText: '+10.0% 基础掉率', ratio: 0.15, tier: '凡品', pts: '0.0点' },
+          { group: '气运与财源', god: '偏财', name: '高级珍宝掉落', valText: '+8.0% 奇珍寻获', ratio: 0.15, tier: '凡品', pts: '0.0点' }
+        ],
+        wuxing: [
+          { el: '木', pct: 2 },
+          { el: '火', pct: 20 },
+          { el: '土', pct: 26 },
+          { el: '金', pct: 38 },
+          { el: '水', pct: 14 }
+        ]
+      }
+    ];
+
+    let currentPresetIndex = 0;
+
+    // 圆角矩形辅助函数
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    // 绘制中式八角星盘暗纹
+    function drawCompassWatermark(ctx, cx, cy, radius, color) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+
+      // 同心圆
+      [radius, radius * 0.82, radius * 0.62, radius * 0.35].forEach(r => {
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // 24山向射线
+      for (let i = 0; i < 24; i++) {
+        const angle = (i * Math.PI) / 12;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * radius * 0.35, Math.sin(angle) * radius * 0.35);
+        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // 绘制角花装饰
+    function drawCornerOrnaments(ctx, x, y, w, h, len, color) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      const corners = [
+        [x, y, 1, 1],
+        [x + w, y, -1, 1],
+        [x, y + h, 1, -1],
+        [x + w, y + h, -1, -1]
+      ];
+      corners.forEach(([cx, cy, dx, dy]) => {
+        ctx.beginPath();
+        ctx.moveTo(cx + dx * len, cy);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(cx, cy + dy * len);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(cx + dx * 6, cy + dy * 6);
+        ctx.lineTo(cx + dx * (len * 0.55), cy + dy * 6);
+        ctx.moveTo(cx + dx * 6, cy + dy * 6);
+        ctx.lineTo(cx + dx * 6, cy + dy * (len * 0.55));
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    // 主渲染函数
+    function renderShareCard(data) {
+      const canvas = document.getElementById('shareCanvas');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+
+      // 1. 玄墨黑渐变底色
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, '#111318');
+      bgGrad.addColorStop(0.5, '#171A21');
+      bgGrad.addColorStop(1, '#101216');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2. 背景罗盘星轨暗纹
+      drawCompassWatermark(ctx, W - 150, 210, 260, 'rgba(200, 169, 107, 0.055)');
+      drawCompassWatermark(ctx, 140, H - 220, 220, 'rgba(200, 169, 107, 0.04)');
+
+      // 3. 外层暗金双线画框
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(20, 20, W - 40, H - 40);
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.18)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(26, 26, W - 52, H - 52);
+      drawCornerOrnaments(ctx, 20, 20, W - 40, H - 40, 26, '#C8A96B');
+
+      // 4. 顶部品牌眉批栏 (Y: 42 ~ 82)
+      ctx.fillStyle = '#C8A96B';
+      ctx.font = '600 15px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('☯ 生辰造化 · 天干地支先天 RPG 数值推演器', 48, 64);
+
+      ctx.fillStyle = '#8E9299';
+      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('万年历引擎 (-5000 ~ +5000)  |  藏干加成 ≤ 主柱 1/3', W - 48, 64);
+
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.25)';
+      ctx.beginPath();
+      ctx.moveTo(48, 78);
+      ctx.lineTo(W - 48, 78);
+      ctx.stroke();
+
+      // =========================================================================
+      // 模块一：角色铭牌与日主五行总览 (Y: 96 ~ 276)
+      // =========================================================================
+      const headerY = 96;
+      const headerH = 182;
+      roundRect(ctx, 48, headerY, W - 96, headerH, 12);
+      ctx.fillStyle = 'rgba(28, 31, 38, 0.9)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.4)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // 左侧：日主五行图腾徽章
+      const dmColor = WUXING_COLORS[data.dayMasterElement];
+      const badgeCx = 126;
+      const badgeCy = headerY + 78;
+      ctx.beginPath();
+      ctx.arc(badgeCx, badgeCy, 46, 0, Math.PI * 2);
+      ctx.fillStyle = dmColor.bg;
+      ctx.fill();
+      ctx.strokeStyle = dmColor.main;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(badgeCx, badgeCy, 39, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = dmColor.main;
+      ctx.font = 'bold 28px "Songti SC", "SimSun", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(data.dayMaster, badgeCx, badgeCy + 10);
+
+      ctx.fillStyle = '#D0D4DC';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText(data.dayMasterDesc, badgeCx, headerY + 152);
+
+      // 中部：角色名、纪元标签、先天命格称号、判词
+      const infoX = 198;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#F5F0E6';
+      ctx.font = 'bold 26px "Microsoft YaHei", sans-serif';
+      ctx.fillText(data.name, infoX, headerY + 42);
+
+      const nameWidth = ctx.measureText(data.name).width;
+
+      // 性别胶囊
+      roundRect(ctx, infoX + nameWidth + 14, headerY + 21, 86, 25, 6);
+      ctx.fillStyle = 'rgba(200, 169, 107, 0.16)';
+      ctx.fill();
+      ctx.strokeStyle = '#C8A96B';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#E5C88E';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(data.gender, infoX + nameWidth + 57, headerY + 38);
+
+      // 纪元胶囊
+      roundRect(ctx, infoX + nameWidth + 110, headerY + 21, 185, 25, 6);
+      ctx.fillStyle = 'rgba(74, 152, 232, 0.15)';
+      ctx.fill();
+      ctx.strokeStyle = '#4A98E8';
+      ctx.stroke();
+      ctx.fillStyle = '#85B8F2';
+      ctx.fillText(data.eraTag, infoX + nameWidth + 202, headerY + 38);
+
+      // SSR 评级标签
+      roundRect(ctx, W - 205, headerY + 20, 138, 28, 6);
+      ctx.fillStyle = 'rgba(255, 184, 0, 0.2)';
+      ctx.fill();
+      ctx.strokeStyle = '#FFB800';
+      ctx.stroke();
+      ctx.fillStyle = '#FFD04D';
+      ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+      ctx.fillText(data.rating, W - 136, headerY + 39);
+
+      // 命格大称号
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#F2C94C';
+      ctx.font = 'bold 21px "Songti SC", "Microsoft YaHei", serif';
+      ctx.fillText(data.title, infoX, headerY + 80);
+
+      // 命格判词
+      ctx.fillStyle = '#B8BDC8';
+      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.fillText(data.poem, infoX, headerY + 108);
+
+      // 出生生辰双维度回显
+      ctx.fillStyle = '#8E9299';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText(data.dateDesc, infoX, headerY + 136);
+      ctx.fillStyle = '#6E737D';
+      ctx.fillText(data.subDateDesc, infoX, headerY + 156);
+
+      // 流派 Tags
+      let tagX = W - 68;
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      for (let i = data.buildTags.length - 1; i >= 0; i--) {
+        const t = data.buildTags[i];
+        const tw = ctx.measureText(t).width + 20;
+        tagX -= tw;
+        roundRect(ctx, tagX, headerY + 134, tw, 24, 12);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(200, 169, 107, 0.35)';
+        ctx.stroke();
+        ctx.fillStyle = '#E0D6C3';
+        ctx.textAlign = 'center';
+        ctx.fillText('#' + t, tagX + tw / 2, headerY + 150);
+        tagX -= 8;
+      }
+
+      // =========================================================================
+      // 模块二：四柱八字排盘与五行能量（Y: 294 ~ 558）
+      // =========================================================================
+      const sec2Y = 294;
+      const sec2H = 262;
+
+      // 左半：四柱八字命盘 (宽 600)
+      const baziW = 590;
+      roundRect(ctx, 48, sec2Y, baziW, sec2H, 12);
+      ctx.fillStyle = 'rgba(24, 27, 34, 0.9)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // 标题栏
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#E5C88E';
+      ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+      ctx.fillText('❖ 四柱八字命盘（主柱 100 点基准 · 藏干加成 ≤ 主柱 1/3）', 66, sec2Y + 28);
+
+      // 绘制四柱卡片
+      const colW = 132;
+      const colGap = 10;
+      const startColX = 64;
+      const colTopY = sec2Y + 42;
+      const colH = 204;
+
+      data.pillars.forEach((p, idx) => {
+        const cx = startColX + idx * (colW + colGap);
+        roundRect(ctx, cx, colTopY, colW, colH, 8);
+        ctx.fillStyle = idx === 2 ? 'rgba(200, 169, 107, 0.09)' : 'rgba(17, 19, 24, 0.75)';
+        ctx.fill();
+        ctx.strokeStyle = idx === 2 ? '#C8A96B' : 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = idx === 2 ? 1.5 : 1;
+        ctx.stroke();
+
+        // 柱名与主柱权重
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#B8BDC8';
+        ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(p.pos, cx + colW / 2, colTopY + 19);
+
+        ctx.fillStyle = '#7E8490';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText('主柱 ' + p.mainWeight + '点', cx + colW / 2, colTopY + 35);
+
+        // 天干 + 十神
+        const stemColor = WUXING_COLORS[p.stemEl].main;
+        ctx.fillStyle = stemColor;
+        ctx.font = 'bold 26px "Songti SC", "SimSun", serif';
+        ctx.fillText(p.stem, cx + 34, colTopY + 72);
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#E5E7EB';
+        ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(p.stemGod, cx + 56, colTopY + 61);
+        ctx.fillStyle = '#8E9299';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(p.stemPts + '点', cx + 56, colTopY + 76);
+
+        // 地支 + 本气十神
+        const branchColor = WUXING_COLORS[p.branchEl].main;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = branchColor;
+        ctx.font = 'bold 26px "Songti SC", "SimSun", serif';
+        ctx.fillText(p.branch, cx + 34, colTopY + 112);
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#E5E7EB';
+        ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(p.branchGod, cx + 56, colTopY + 101);
+        ctx.fillStyle = '#8E9299';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(p.branchPts + '点·' + p.branchAnimal, cx + 56, colTopY + 116);
+
+        // 分割虚线
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.moveTo(cx + 10, colTopY + 126);
+        ctx.lineTo(cx + colW - 10, colTopY + 126);
+        ctx.stroke();
+
+        // 藏干藏支微缩区 (≤1/3 主柱)
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#C8A96B';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText('藏干 ' + p.hiddenCap, cx + colW / 2, colTopY + 143);
+
+        p.hiddens.forEach((h, hIdx) => {
+          ctx.fillStyle = '#9CA3AF';
+          ctx.font = '12px "Microsoft YaHei", sans-serif';
+          ctx.fillText(h.text, cx + colW / 2, colTopY + 161 + hIdx * 16);
+        });
+
+        // 底部十二长生印章
+        roundRect(ctx, cx + 18, colTopY + colH - 24, colW - 36, 19, 4);
+        ctx.fillStyle = 'rgba(200, 169, 107, 0.14)';
+        ctx.fill();
+        ctx.fillStyle = '#E5C88E';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(p.stage, cx + colW / 2, colTopY + colH - 10);
+      });
+
+      // 右半：五行能量底盘分布 (宽 260)
+      const wxX = 48 + baziW + 14;
+      const wxW = W - 48 - wxX;
+      roundRect(ctx, wxX, sec2Y, wxW, sec2H, 12);
+      ctx.fillStyle = 'rgba(24, 27, 34, 0.9)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#E5C88E';
+      ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+      ctx.fillText('❖ 五行灵根亲和度', wxX + 18, sec2Y + 28);
+
+      data.wuxing.forEach((item, idx) => {
+        const rowY = sec2Y + 58 + idx * 38;
+        const c = WUXING_COLORS[item.el];
+
+        // 五行标签
+        ctx.textAlign = 'left';
+        ctx.fillStyle = c.main;
+        ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+        ctx.fillText(c.label, wxX + 18, rowY + 12);
+
+        // 百分比数字
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#E5E7EB';
+        ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+        ctx.fillText(item.pct + '%', wxX + wxW - 18, rowY + 12);
+
+        // 进度条槽
+        const barX = wxX + 86;
+        const barW = wxW - 148;
+        roundRect(ctx, barX, rowY + 1, barW, 12, 6);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+        ctx.fill();
+
+        // 进度条填充
+        const fillW = Math.max(8, (item.pct / 50) * barW);
+        roundRect(ctx, barX, rowY + 1, Math.min(barW, fillW), 12, 6);
+        ctx.fillStyle = c.main;
+        ctx.fill();
+      });
+
+      // =========================================================================
+      // 模块三：本命核心天赋槽 Top 3 (Y: 572 ~ 714)
+      // =========================================================================
+      const sec3Y = 572;
+      const sec3H = 140;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#E5C88E';
+      ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+      ctx.fillText('❖ 本命核心十神词条（Top 3 先天法则加持）', 52, sec3Y + 20);
+
+      const cardW = (W - 96 - 28) / 3;
+      data.topTalents.forEach((t, idx) => {
+        const tx = 48 + idx * (cardW + 14);
+        const ty = sec3Y + 32;
+        const th = 106;
+        const tierStyle = TIER_COLORS[t.tier];
+
+        roundRect(ctx, tx, ty, cardW, th, 10);
+        ctx.fillStyle = 'rgba(28, 31, 39, 0.95)';
+        ctx.fill();
+        ctx.strokeStyle = tierStyle.border;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 左上角十神 + 品阶印章
+        roundRect(ctx, tx + 14, ty + 12, 114, 24, 5);
+        ctx.fillStyle = tierStyle.bg;
+        ctx.fill();
+        ctx.strokeStyle = tierStyle.border;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = tierStyle.color;
+        ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+        ctx.fillText('【' + t.god + ' · ' + t.tier + '】', tx + 71, ty + 28);
+
+        // 右上角属性名
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#D0D4DC';
+        ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+        ctx.fillText(t.stat, tx + cardW - 14, ty + 28);
+
+        // 中央大号数值
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 24px "Microsoft YaHei", sans-serif';
+        ctx.fillText(t.val, tx + 16, ty + 66);
+
+        // 底部溯源说明
+        ctx.fillStyle = '#8E9299';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText('溯源：' + t.src, tx + 16, ty + 92);
+      });
+
+      // =========================================================================
+      // 模块四：十神全属性 RPG 面板矩阵 (Y: 730 ~ 1218)
+      // =========================================================================
+      const sec4Y = 730;
+      const sec4H = 486;
+      roundRect(ctx, 48, sec4Y, W - 96, sec4H, 12);
+      ctx.fillStyle = 'rgba(24, 27, 34, 0.92)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#E5C88E';
+      ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+      ctx.fillText('❖ 十神全属性转化面板（10 项先天 RPG 词条总览）', 68, sec4Y + 32);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#8E9299';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText('品阶色标：仙品(金) / 极品(紫) / 珍品(蓝) / 良品(绿) / 凡品(灰)', W - 68, sec4Y + 32);
+
+      // 双列 5 行布局展示 10 个十神属性
+      const statColW = (W - 96 - 56) / 2;
+      const rowH = 74;
+      const startStatY = sec4Y + 52;
+
+      data.allStats.forEach((st, idx) => {
+        const colIdx = idx % 2;
+        const rowIdx = Math.floor(idx / 2);
+        const sx = 68 + colIdx * (statColW + 20);
+        const sy = startStatY + rowIdx * (rowH + 10);
+        const tierStyle = TIER_COLORS[st.tier];
+
+        roundRect(ctx, sx, sy, statColW, rowH, 8);
+        ctx.fillStyle = 'rgba(17, 19, 24, 0.8)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 十神徽章
+        roundRect(ctx, sx + 12, sy + 12, 52, 24, 5);
+        ctx.fillStyle = tierStyle.bg;
+        ctx.fill();
+        ctx.strokeStyle = tierStyle.border;
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = tierStyle.color;
+        ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+        ctx.fillText(st.god, sx + 38, sy + 28);
+
+        // 属性名称与分组
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#F3F4F6';
+        ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+        ctx.fillText(st.name, sx + 74, sy + 28);
+
+        // 右侧具体数值与得分
+        ctx.textAlign = 'right';
+        ctx.fillStyle = tierStyle.color;
+        ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+        ctx.fillText(st.valText, sx + statColW - 14, sy + 28);
+
+        // 底部进度条背景
+        const barX = sx + 12;
+        const barY = sy + 48;
+        const barW = statColW - 96;
+        roundRect(ctx, barX, barY, barW, 12, 6);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+        ctx.fill();
+
+        // 进度条高亮
+        const fillW = Math.max(10, barW * st.ratio);
+        roundRect(ctx, barX, barY, fillW, 12, 6);
+        ctx.fillStyle = tierStyle.color;
+        ctx.fill();
+
+        // 右下角权重积分
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#8E9299';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(st.pts, sx + statColW - 14, sy + 59);
+      });
+
+      // =========================================================================
+      // 模块五：底部防伪印章与分享脚标 (Y: 1232 ~ 1285)
+      // =========================================================================
+      const footY = 1236;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#8E9299';
+      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.fillText('生辰造化 · Ganzhi-to-RPG-Toy  |  你或你的 OC 的生日先天数值推演卡', 48, footY + 20);
+      ctx.fillStyle = '#6E737D';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText('规则摘要：支持公历/农历日期与现代时/十二时辰自由混搭输入，万年历跨度 (-5000~+5000)，地支藏干加成封顶为主柱 1/3。', 48, footY + 40);
+
+      // 右下角朱砂篆印
+      const sealX = W - 158;
+      const sealY = footY + 2;
+      roundRect(ctx, sealX, sealY, 110, 44, 6);
+      ctx.fillStyle = 'rgba(216, 58, 49, 0.18)';
+      ctx.fill();
+      ctx.strokeStyle = '#D83A31';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#F06A63';
+      ctx.font = 'bold 15px "Songti SC", "SimSun", serif';
+      ctx.fillText('天命造化印', sealX + 55, sealY + 28);
+    }
+
+    function selectPreset(index) {
+      currentPresetIndex = index;
+      for (let i = 0; i < PRESETS.length; i++) {
+        const btn = document.getElementById('btn-preset-' + i);
+        if (i === index) {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#C8A96B] bg-[#C8A96B]/20 text-[var(--foreground)] transition-all';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all';
+        }
+      }
+      renderShareCard(PRESETS[index]);
+    }
+
+    function downloadPoster() {
+      const canvas = document.getElementById('shareCanvas');
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      const presetName = PRESETS[currentPresetIndex].name;
+      link.download = `生辰造化_命格卡_${presetName}.png`;
+      link.href = dataUrl;
+      link.click();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      selectPreset(0);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>生辰造化 · App 图标设计画布</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+</head>
+<body class="bg-transparent text-[var(--foreground)] antialiased p-4">
+  <div class="bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] rounded-xl p-5 shadow-sm max-w-4xl mx-auto">
+    <!-- 顶部栏 -->
+    <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[var(--border)]">
+      <div>
+        <h2 class="text-base font-semibold text-[var(--foreground)]">生辰造化 · App 图标设计工坊 (Canvas 1024×1024)</h2>
+        <p class="text-xs text-[var(--muted-foreground)] mt-0.5">
+          融合「天干地支罗盘 × 五行灵根 × RPG 晶石骰子」，支持切换 3 套设计方案、圆角遮罩及导出高清 PNG。
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="scheme-0" onclick="setScheme(0)" class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all">
+          方案 A：天命星盘骰 (推荐)
+        </button>
+        <button id="scheme-1" onclick="setScheme(1)" class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all">
+          方案 B：四柱玄金印
+        </button>
+        <button id="scheme-2" onclick="setScheme(2)" class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all">
+          方案 C：太极五行核
+        </button>
+      </div>
+    </div>
+
+    <!-- 主体展示：左侧大图预览 + 右侧多尺寸与导出控制 -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 pt-5 items-center">
+      <!-- 左侧：主画布 1024x1024 缩放预览 -->
+      <div class="md:col-span-6 flex flex-col items-center">
+        <div class="relative p-3 rounded-2xl bg-[var(--background)] border border-[var(--border)] shadow-inner">
+          <canvas id="mainIconCanvas" width="1024" height="1024" class="w-64 h-64 md:w-72 md:h-72 block"></canvas>
+        </div>
+        <span id="schemeDesc" class="text-xs text-[var(--muted-foreground)] mt-2.5 text-center">
+          外圈十二地支罗盘 + 五行能量环 + 中央 RPG 二十面体天命晶石
+        </span>
+      </div>
+
+      <!-- 右侧：多平台实机预览与导出设置 -->
+      <div class="md:col-span-6 space-y-4">
+        <!-- 遮罩形状切换 -->
+        <div class="bg-[var(--background)] border border-[var(--border)] rounded-lg p-3.5">
+          <div class="text-xs font-semibold text-[var(--foreground)] mb-2">1. 图标裁切遮罩 (Mask Shape)</div>
+          <div class="flex flex-wrap gap-2">
+            <button id="mask-squircle" onclick="setMask('squircle')" class="px-3 py-1 rounded text-xs border transition-all">
+              iOS / macOS 圆角矩形
+            </button>
+            <button id="mask-circle" onclick="setMask('circle')" class="px-3 py-1 rounded text-xs border transition-all">
+              Android 圆形图标
+            </button>
+            <button id="mask-square" onclick="setMask('square')" class="px-3 py-1 rounded text-xs border transition-all">
+              完整方形底图 (无裁切)
+            </button>
+          </div>
+        </div>
+
+        <!-- 多尺寸实机效果预览 -->
+        <div class="bg-[var(--background)] border border-[var(--border)] rounded-lg p-3.5">
+          <div class="text-xs font-semibold text-[var(--foreground)] mb-3">2. 多尺寸缩略实机预览</div>
+          <div class="flex items-end gap-5">
+            <div class="flex flex-col items-center gap-1.5">
+              <canvas id="preview128" width="128" height="128" class="w-16 h-16 block"></canvas>
+              <span class="text-xs text-[var(--muted-foreground)]">桌面端 (64px)</span>
+            </div>
+            <div class="flex flex-col items-center gap-1.5">
+              <canvas id="preview64" width="64" height="64" class="w-11 h-11 block"></canvas>
+              <span class="text-xs text-[var(--muted-foreground)]">手机主屏 (44px)</span>
+            </div>
+            <div class="flex flex-col items-center gap-1.5">
+              <canvas id="preview32" width="32" height="32" class="w-7 h-7 block"></canvas>
+              <span class="text-xs text-[var(--muted-foreground)]">网页 Favicon</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 导出按钮组 -->
+        <div class="flex flex-wrap gap-2.5 pt-1">
+          <button onclick="downloadIcon(1024)" class="flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90 transition-opacity shadow-sm text-center">
+            📥 导出 1024×1024 高清图标 (PNG)
+          </button>
+          <button onclick="downloadIcon(256)" class="px-3.5 py-2 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] hover:opacity-80 transition-opacity">
+            导出 256×256
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentScheme = 0;
+    let currentMask = 'squircle'; // 'squircle' | 'circle' | 'square'
+
+    const SCHEME_DESCRIPTIONS = [
+      '方案 A【天命星盘骰】：外圈十二地支罗盘 + 五行生克星轨 + 中央 RPG 二十面体赤金晶石与「命」字篆印',
+      '方案 B【四柱玄金印】：四柱玉简矩阵 + 天干地支暗金铭文 + RPG 属性剑盾徽章纹章',
+      '方案 C【太极五行核】：阴阳双鱼星璇 + 金木水火土五行灵珠环绕 + 中央天命罗盘指针'
+    ];
+
+    const EARTHLY_BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+    const HEAVENLY_STEMS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+    const WUXING_NODES = [
+      { name: '木', color: '#4CAF7A', glow: 'rgba(76, 175, 122, 0.55)' },
+      { name: '火', color: '#E85D4E', glow: 'rgba(232, 93, 78, 0.55)' },
+      { name: '土', color: '#E0A84E', glow: 'rgba(224, 168, 78, 0.55)' },
+      { name: '金', color: '#F2C94C', glow: 'rgba(242, 201, 76, 0.55)' },
+      { name: '水', color: '#4A98E8', glow: 'rgba(74, 152, 232, 0.55)' }
+    ];
+
+    // 绘制 iOS 风格平滑圆角或圆形遮罩
+    function applyMaskPath(ctx, size, maskType) {
+      ctx.beginPath();
+      if (maskType === 'circle') {
+        ctx.arc(size / 2, size / 2, size * 0.47, 0, Math.PI * 2);
+      } else if (maskType === 'squircle') {
+        const pad = size * 0.03;
+        const w = size - pad * 2;
+        const r = w * 0.225;
+        ctx.moveTo(pad + r, pad);
+        ctx.lineTo(pad + w - r, pad);
+        ctx.quadraticCurveTo(pad + w, pad, pad + w, pad + r);
+        ctx.lineTo(pad + w, pad + w - r);
+        ctx.quadraticCurveTo(pad + w, pad + w, pad + w - r, pad + w);
+        ctx.lineTo(pad + r, pad + w);
+        ctx.quadraticCurveTo(pad, pad + w, pad, pad + w - r);
+        ctx.lineTo(pad, pad + r);
+        ctx.quadraticCurveTo(pad, pad, pad + r, pad);
+      } else {
+        ctx.rect(0, 0, size, size);
+      }
+      ctx.closePath();
+    }
+
+    // 绘制通用玄墨暗金底板与星轨暗纹
+    function drawIconBase(ctx, size) {
+      const cx = size / 2;
+      const cy = size / 2;
+
+      // 径向深邃玄墨渐变
+      const bgGrad = ctx.createRadialGradient(cx, cy * 0.85, size * 0.05, cx, cy, size * 0.65);
+      bgGrad.addColorStop(0, '#232834');
+      bgGrad.addColorStop(0.55, '#14171F');
+      bgGrad.addColorStop(1, '#0B0D12');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, size, size);
+
+      // 顶部微光反射
+      const topGlow = ctx.createLinearGradient(0, 0, 0, size * 0.45);
+      topGlow.addColorStop(0, 'rgba(200, 169, 107, 0.14)');
+      topGlow.addColorStop(1, 'rgba(200, 169, 107, 0)');
+      ctx.fillStyle = topGlow;
+      ctx.fillRect(0, 0, size, size * 0.45);
+    }
+
+    // =========================================================================
+    // 方案 A：天命星盘骰（十二地支罗盘 + 五行生克环 + RPG D20 晶石）
+    // =========================================================================
+    function drawSchemeA(ctx, size) {
+      const cx = size / 2;
+      const cy = size / 2;
+
+      // 1. 外层暗金罗盘圈
+      const outerR = size * 0.415;
+      const innerCompassR = size * 0.335;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // 罗盘底座圆环
+      ctx.beginPath();
+      ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+      ctx.strokeStyle = '#C8A96B';
+      ctx.lineWidth = size * 0.008;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, innerCompassR, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.55)';
+      ctx.lineWidth = size * 0.004;
+      ctx.stroke();
+
+      // 24节气/山向刻度线与十二地支文字
+      for (let i = 0; i < 24; i++) {
+        const angle = (i * Math.PI) / 12 - Math.PI / 2;
+        const isMain = i % 2 === 0;
+        const rStart = isMain ? innerCompassR : outerR - size * 0.022;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * rStart, Math.sin(angle) * rStart);
+        ctx.lineTo(Math.cos(angle) * outerR, Math.sin(angle) * outerR);
+        ctx.strokeStyle = isMain ? 'rgba(200, 169, 107, 0.45)' : 'rgba(200, 169, 107, 0.25)';
+        ctx.lineWidth = isMain ? size * 0.003 : size * 0.002;
+        ctx.stroke();
+      }
+
+      // 十二地支铭文
+      const textR = (outerR + innerCompassR) / 2;
+      ctx.fillStyle = '#E5C88E';
+      ctx.font = `bold ${Math.round(size * 0.042)}px "Songti SC", "SimSun", serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < 12; i++) {
+        const angle = (i * Math.PI) / 6 - Math.PI / 2;
+        ctx.save();
+        ctx.translate(Math.cos(angle) * textR, Math.sin(angle) * textR);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.fillText(EARTHLY_BRANCHES[i], 0, 0);
+        ctx.restore();
+      }
+
+      // 2. 中层：五行能量节点与星芒阵
+      const pentagonR = size * 0.285;
+      // 五角星连线（五行相克星轨）
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const idx = (i * 2) % 5;
+        const angle = (idx * Math.PI * 2) / 5 - Math.PI / 2;
+        const px = Math.cos(angle) * pentagonR;
+        const py = Math.sin(angle) * pentagonR;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.28)';
+      ctx.lineWidth = size * 0.004;
+      ctx.stroke();
+
+      // 3. 中央：RPG 二十面体天命骰 (D20 几何切面晶石)
+      const d20R = size * 0.235;
+      const hexPts = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (i * Math.PI) / 3 - Math.PI / 2;
+        hexPts.push({ x: Math.cos(a) * d20R, y: Math.sin(a) * d20R });
+      }
+      const innerTriR = size * 0.132;
+      const triPts = [];
+      for (let i = 0; i < 3; i++) {
+        const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
+        triPts.push({ x: Math.cos(a) * innerTriR, y: Math.sin(a) * innerTriR });
+      }
+
+      // D20 背光光晕
+      const coreGlow = ctx.createRadialGradient(0, 0, size * 0.02, 0, 0, d20R * 1.25);
+      coreGlow.addColorStop(0, 'rgba(255, 184, 0, 0.45)');
+      coreGlow.addColorStop(0.6, 'rgba(232, 93, 78, 0.20)');
+      coreGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = coreGlow;
+      ctx.beginPath();
+      ctx.arc(0, 0, d20R * 1.25, 0, Math.PI * 2);
+      ctx.fill();
+
+      // D20 外六边形主体填充
+      const d20Grad = ctx.createLinearGradient(-d20R, -d20R, d20R, d20R);
+      d20Grad.addColorStop(0, '#3D261E');
+      d20Grad.addColorStop(0.5, '#251819');
+      d20Grad.addColorStop(1, '#141118');
+      ctx.beginPath();
+      hexPts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.closePath();
+      ctx.fillStyle = d20Grad;
+      ctx.fill();
+      ctx.strokeStyle = '#FFD04D';
+      ctx.lineWidth = size * 0.01;
+      ctx.stroke();
+
+      // D20 内部棱线网络
+      ctx.strokeStyle = 'rgba(255, 208, 77, 0.55)';
+      ctx.lineWidth = size * 0.005;
+      // 中心正三角形
+      ctx.beginPath();
+      triPts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(242, 201, 76, 0.14)';
+      ctx.fill();
+      ctx.stroke();
+
+      // 连接外六边形顶点与内三角形顶点
+      for (let i = 0; i < 3; i++) {
+        const tp = triPts[i];
+        const hp1 = hexPts[i * 2];
+        const hp2 = hexPts[(i * 2 + 1) % 6];
+        const hpPrev = hexPts[(i * 2 + 5) % 6];
+
+        ctx.beginPath();
+        ctx.moveTo(tp.x, tp.y);
+        ctx.lineTo(hp1.x, hp1.y);
+        ctx.moveTo(tp.x, tp.y);
+        ctx.lineTo(hp2.x, hp2.y);
+        ctx.moveTo(tp.x, tp.y);
+        ctx.lineTo(hpPrev.x, hpPrev.y);
+        ctx.stroke();
+      }
+
+      // 4. 五行灵珠镶嵌在五角方位
+      for (let i = 0; i < 5; i++) {
+        const angle = (i * Math.PI * 2) / 5 - Math.PI / 2;
+        const ox = Math.cos(angle) * pentagonR;
+        const oy = Math.sin(angle) * pentagonR;
+        const orbR = size * 0.026;
+
+        ctx.beginPath();
+        ctx.arc(ox, oy, orbR * 1.6, 0, Math.PI * 2);
+        ctx.fillStyle = WUXING_NODES[i].glow;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(ox, oy, orbR, 0, Math.PI * 2);
+        ctx.fillStyle = WUXING_NODES[i].color;
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = size * 0.003;
+        ctx.stroke();
+      }
+
+      // 5. 核心字印：「命」字鎏金大印
+      ctx.fillStyle = '#FFE082';
+      ctx.shadowColor = 'rgba(255, 184, 0, 0.85)';
+      ctx.shadowBlur = size * 0.03;
+      ctx.font = `bold ${Math.round(size * 0.115)}px "Songti SC", "SimSun", serif`;
+      ctx.fillText('命', 0, size * 0.012);
+      ctx.shadowBlur = 0;
+
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // 方案 B：四柱玄金印（四柱玉简矩阵 + RPG 剑盾纹章）
+    // =========================================================================
+    function drawSchemeB(ctx, size) {
+      const cx = size / 2;
+      const cy = size / 2;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // 1. 背景八角盾牌阵
+      const shieldR = size * 0.39;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4 + Math.PI / 8;
+        const x = Math.cos(a) * shieldR;
+        const y = Math.sin(a) * shieldR;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(200, 169, 107, 0.07)';
+      ctx.fill();
+      ctx.strokeStyle = '#C8A96B';
+      ctx.lineWidth = size * 0.01;
+      ctx.stroke();
+
+      // 2. 中央竖排四柱玉简（年、月、日、时四柱）
+      const pillarCols = [
+        { stem: '壬', branch: '子', color: '#4A98E8' },
+        { stem: '己', branch: '酉', color: '#F2C94C' },
+        { stem: '丙', branch: '寅', color: '#E85D4E', highlight: true },
+        { stem: '甲', branch: '午', color: '#4CAF7A' }
+      ];
+
+      const colW = size * 0.13;
+      const colH = size * 0.44;
+      const gap = size * 0.022;
+      const totalW = colW * 4 + gap * 3;
+      const startX = -totalW / 2;
+      const startY = -colH / 2 + size * 0.02;
+
+      // 顶部装饰横梁（RPG 属性冠冕）
+      ctx.beginPath();
+      ctx.moveTo(-totalW * 0.48, startY - size * 0.045);
+      ctx.lineTo(0, startY - size * 0.095);
+      ctx.lineTo(totalW * 0.48, startY - size * 0.045);
+      ctx.strokeStyle = '#FFD04D';
+      ctx.lineWidth = size * 0.012;
+      ctx.stroke();
+
+      pillarCols.forEach((p, idx) => {
+        const px = startX + idx * (colW + gap);
+        const py = p.highlight ? startY - size * 0.02 : startY;
+
+        // 玉简背景
+        ctx.beginPath();
+        ctx.roundRect(px, py, colW, colH, size * 0.02);
+        ctx.fillStyle = p.highlight ? 'rgba(232, 93, 78, 0.22)' : 'rgba(22, 26, 34, 0.92)';
+        ctx.fill();
+        ctx.strokeStyle = p.highlight ? '#FFD04D' : 'rgba(200, 169, 107, 0.55)';
+        ctx.lineWidth = p.highlight ? size * 0.008 : size * 0.004;
+        ctx.stroke();
+
+        // 天干文字
+        ctx.fillStyle = p.color;
+        ctx.font = `bold ${Math.round(size * 0.082)}px "Songti SC", "SimSun", serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.stem, px + colW / 2, py + colH * 0.3);
+
+        // 中间分隔符
+        ctx.beginPath();
+        ctx.arc(px + colW / 2, py + colH * 0.5, size * 0.008, 0, Math.PI * 2);
+        ctx.fillStyle = '#C8A96B';
+        ctx.fill();
+
+        // 地支文字
+        ctx.fillStyle = '#F5F0E6';
+        ctx.fillText(p.branch, px + colW / 2, py + colH * 0.72);
+      });
+
+      // 底部朱砂「RPG」天命印章
+      const sealW = size * 0.24;
+      const sealH = size * 0.085;
+      ctx.beginPath();
+      ctx.roundRect(-sealW / 2, startY + colH + size * 0.035, sealW, sealH, size * 0.015);
+      ctx.fillStyle = '#D83A31';
+      ctx.fill();
+      ctx.strokeStyle = '#FFD04D';
+      ctx.lineWidth = size * 0.005;
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFF8EB';
+      ctx.font = `bold ${Math.round(size * 0.045)}px "Microsoft YaHei", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('生辰 · 造化', 0, startY + colH + size * 0.035 + sealH / 2);
+
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // 方案 C：太极五行核（阴阳星璇 + 五行灵珠相生环 + 罗盘神针）
+    // =========================================================================
+    function drawSchemeC(ctx, size) {
+      const cx = size / 2;
+      const cy = size / 2;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // 1. 外层十天干星环
+      const outerRingR = size * 0.39;
+      ctx.beginPath();
+      ctx.arc(0, 0, outerRingR, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.4)';
+      ctx.lineWidth = size * 0.005;
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(229, 200, 142, 0.75)';
+      ctx.font = `bold ${Math.round(size * 0.038)}px "Songti SC", "SimSun", serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < 10; i++) {
+        const a = (i * Math.PI * 2) / 10 - Math.PI / 2;
+        ctx.fillText(HEAVENLY_STEMS[i], Math.cos(a) * outerRingR, Math.sin(a) * outerRingR);
+      }
+
+      // 2. 五行相生圆环与大型五行法球
+      const orbitR = size * 0.265;
+      ctx.beginPath();
+      ctx.arc(0, 0, orbitR, 0, Math.PI * 2);
+      ctx.strokeStyle = '#C8A96B';
+      ctx.lineWidth = size * 0.008;
+      ctx.stroke();
+
+      // 3. 中央暗金阴阳太极盘
+      const taijiR = size * 0.145;
+      ctx.beginPath();
+      ctx.arc(0, 0, taijiR, 0, Math.PI * 2);
+      ctx.fillStyle = '#1B1F2A';
+      ctx.fill();
+      ctx.strokeStyle = '#FFD04D';
+      ctx.lineWidth = size * 0.008;
+      ctx.stroke();
+
+      // 罗盘十字星芒指针
+      ctx.beginPath();
+      const needleLen = size * 0.19;
+      const needleW = size * 0.028;
+      ctx.moveTo(0, -needleLen);
+      ctx.lineTo(needleW, 0);
+      ctx.lineTo(0, needleLen);
+      ctx.lineTo(-needleW, 0);
+      ctx.closePath();
+      ctx.fillStyle = '#FFD04D';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(-needleLen, 0);
+      ctx.lineTo(0, needleW);
+      ctx.lineTo(needleLen, 0);
+      ctx.lineTo(0, -needleW);
+      ctx.closePath();
+      ctx.fillStyle = '#C8A96B';
+      ctx.fill();
+
+      // 五行大灵珠及文字
+      for (let i = 0; i < 5; i++) {
+        const a = (i * Math.PI * 2) / 5 - Math.PI / 2;
+        const x = Math.cos(a) * orbitR;
+        const y = Math.sin(a) * orbitR;
+        const r = size * 0.056;
+
+        // 发光底圈
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.35, 0, Math.PI * 2);
+        ctx.fillStyle = WUXING_NODES[i].glow;
+        ctx.fill();
+
+        // 灵珠实体
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#14171F';
+        ctx.fill();
+        ctx.strokeStyle = WUXING_NODES[i].color;
+        ctx.lineWidth = size * 0.01;
+        ctx.stroke();
+
+        // 五行汉字
+        ctx.fillStyle = WUXING_NODES[i].color;
+        ctx.font = `bold ${Math.round(size * 0.052)}px "Songti SC", "SimSun", serif`;
+        ctx.fillText(WUXING_NODES[i].name, x, y + size * 0.003);
+      }
+
+      // 中心红宝石轴心
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 0.032, 0, Math.PI * 2);
+      ctx.fillStyle = '#E85D4E';
+      ctx.fill();
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = size * 0.005;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // 在指定 canvas 上渲染完整图标
+    function renderIconToCanvas(canvas, schemeIdx, maskType) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      ctx.clearRect(0, 0, size, size);
+
+      ctx.save();
+      // 裁切形状
+      applyMaskPath(ctx, size, maskType);
+      ctx.clip();
+
+      // 1. 绘制玄墨底色
+      drawIconBase(ctx, size);
+
+      // 2. 绘制对应方案主体
+      if (schemeIdx === 0) {
+        drawSchemeA(ctx, size);
+      } else if (schemeIdx === 1) {
+        drawSchemeB(ctx, size);
+      } else {
+        drawSchemeC(ctx, size);
+      }
+
+      // 3. 图标边缘高光内描边（提升精致度）
+      applyMaskPath(ctx, size, maskType);
+      ctx.strokeStyle = 'rgba(200, 169, 107, 0.55)';
+      ctx.lineWidth = size * 0.016;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function updateAllCanvases() {
+      renderIconToCanvas(document.getElementById('mainIconCanvas'), currentScheme, currentMask);
+      renderIconToCanvas(document.getElementById('preview128'), currentScheme, currentMask);
+      renderIconToCanvas(document.getElementById('preview64'), currentScheme, currentMask);
+      renderIconToCanvas(document.getElementById('preview32'), currentScheme, currentMask);
+      document.getElementById('schemeDesc').textContent = SCHEME_DESCRIPTIONS[currentScheme];
+    }
+
+    function setScheme(idx) {
+      currentScheme = idx;
+      for (let i = 0; i < 3; i++) {
+        const btn = document.getElementById('scheme-' + i);
+        if (i === idx) {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#C8A96B] bg-[#C8A96B]/20 text-[var(--foreground)] transition-all';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all';
+        }
+      }
+      updateAllCanvases();
+    }
+
+    function setMask(maskType) {
+      currentMask = maskType;
+      ['squircle', 'circle', 'square'].forEach(m => {
+        const btn = document.getElementById('mask-' + m);
+        if (m === maskType) {
+          btn.className = 'px-3 py-1 rounded text-xs font-semibold border border-[#C8A96B] bg-[#C8A96B]/20 text-[var(--foreground)] transition-all';
+        } else {
+          btn.className = 'px-3 py-1 rounded text-xs font-medium border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all';
+        }
+      });
+      updateAllCanvases();
+    }
+
+    function downloadIcon(targetSize) {
+      const offscreen = document.createElement('canvas');
+      offscreen.width = targetSize;
+      offscreen.height = targetSize;
+      renderIconToCanvas(offscreen, currentScheme, currentMask);
+
+      const link = document.createElement('a');
+      const names = ['天命星盘骰', '四柱玄金印', '太极五行核'];
+      link.download = `ganzhi_rpg_icon_${names[currentScheme]}_${targetSize}x${targetSize}.png`;
+      link.href = offscreen.toDataURL('image/png');
+      link.click();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setScheme(0);
+      setMask('squircle');
+    });
+  </script>
+</body>
+</html>

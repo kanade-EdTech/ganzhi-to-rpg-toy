@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>生辰造化 · 项目封面</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4">
+  <div class="max-w-5xl mx-auto space-y-3">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-base font-semibold">生辰造化 · 项目封面 (1600×900)</h1>
+        <p class="text-xs text-[var(--muted-foreground)]">基于项目界面简化美化：左为标题，右为「四柱命盘 + RPG 属性」界面缩略。</p>
+      </div>
+      <button onclick="dl()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90">📥 导出封面 PNG</button>
+    </div>
+    <div class="rounded-xl overflow-hidden border border-[var(--border)] shadow-lg">
+      <canvas id="c" width="1600" height="900" class="w-full h-auto block"></canvas>
+    </div>
+  </div>
+<script>
+const WX = { 木:'#4CAF7A', 火:'#E85D4E', 土:'#E0A84E', 金:'#F2C94C', 水:'#4A98E8' };
+const SERIF = '"Songti SC","SimSun","Noto Serif SC",serif';
+const SANS = '"Microsoft YaHei","PingFang SC",sans-serif';
+
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
+
+function compass(ctx,cx,cy,R,alpha){
+  ctx.save();ctx.translate(cx,cy);
+  ctx.strokeStyle=`rgba(200,169,107,${alpha})`;ctx.lineWidth=1.5;
+  [1,.84,.66,.4].forEach(k=>{ctx.beginPath();ctx.arc(0,0,R*k,0,Math.PI*2);ctx.stroke();});
+  for(let i=0;i<24;i++){const a=i*Math.PI/12;ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*R*.84,Math.sin(a)*R*.84);ctx.lineTo(Math.cos(a)*R,Math.sin(a)*R);ctx.stroke();}
+  const br='子丑寅卯辰巳午未申酉戌亥';
+  ctx.fillStyle=`rgba(200,169,107,${alpha*1.6})`;ctx.font=`bold ${R*.07}px ${SERIF}`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(let i=0;i<12;i++){const a=i*Math.PI/6-Math.PI/2;
+    ctx.fillText(br[i],Math.cos(a)*R*.75,Math.sin(a)*R*.75);}
+  ctx.restore();
+}
+
+function draw(){
+  const cv=document.getElementById('c'),ctx=cv.getContext('2d'),W=1600,H=900;
+  // 背景
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#0E1016');g.addColorStop(.55,'#171B24');g.addColorStop(1,'#0B0D12');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const glow=ctx.createRadialGradient(1180,430,20,1180,430,640);
+  glow.addColorStop(0,'rgba(200,169,107,.20)');glow.addColorStop(1,'rgba(200,169,107,0)');
+  ctx.fillStyle=glow;ctx.fillRect(0,0,W,H);
+  compass(ctx,1230,450,560,.07);
+  compass(ctx,150,820,260,.05);
+
+  // 边框
+  ctx.strokeStyle='rgba(200,169,107,.45)';ctx.lineWidth=2;ctx.strokeRect(28,28,W-56,H-56);
+  ctx.strokeStyle='rgba(200,169,107,.16)';ctx.lineWidth=1;ctx.strokeRect(38,38,W-76,H-76);
+
+  // ===== 左侧：标题区 =====
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#C8A96B';ctx.font=`600 22px ${SANS}`;
+  ctx.fillText('GANZHI  ·  TO  ·  RPG  ·  TOY',96,170);
+
+  ctx.save();
+  ctx.shadowColor='rgba(255,184,0,.45)';ctx.shadowBlur=40;
+  const tg=ctx.createLinearGradient(0,230,0,420);
+  tg.addColorStop(0,'#FFE9A8');tg.addColorStop(1,'#C8A96B');
+  ctx.fillStyle=tg;ctx.font=`bold 168px ${SERIF}`;
+  ctx.fillText('生辰造化',90,380);
+  ctx.restore();
+
+  ctx.fillStyle='#E8E3D6';ctx.font=`500 40px ${SERIF}`;
+  ctx.fillText('天干地支 · 先天 RPG 数值',96,456);
+
+  ctx.strokeStyle='rgba(200,169,107,.5)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(96,490);ctx.lineTo(420,490);ctx.stroke();
+
+  ctx.fillStyle='#A9AEBB';ctx.font=`26px ${SANS}`;
+  ctx.fillText('输入你或你的 OC 的生辰，',96,544);
+  ctx.fillText('排八字、化十神，生成专属命格属性卡。',96,584);
+
+  // 特性标签
+  const tags=['公历 / 农历','现代时 / 十二时辰','±5000 年万年历','十神 → 游戏数值'];
+  let tx=96,ty=650;ctx.font=`22px ${SANS}`;
+  tags.forEach(t=>{
+    const w=ctx.measureText(t).width+36;
+    if(tx+w>700){tx=96;ty+=56;}
+    rr(ctx,tx,ty,w,42,21);
+    ctx.fillStyle='rgba(200,169,107,.12)';ctx.fill();
+    ctx.strokeStyle='rgba(200,169,107,.55)';ctx.lineWidth=1.2;ctx.stroke();
+    ctx.fillStyle='#E5C88E';ctx.fillText(t,tx+18,ty+29);
+    tx+=w+14;
+  });
+
+  // 五行灵珠
+  let ox=108;
+  Object.entries(WX).forEach(([k,c])=>{
+    ctx.beginPath();ctx.arc(ox,792,22,0,Math.PI*2);
+    ctx.fillStyle='#14171F';ctx.fill();ctx.strokeStyle=c;ctx.lineWidth=3;ctx.stroke();
+    ctx.fillStyle=c;ctx.font=`bold 24px ${SERIF}`;ctx.textAlign='center';
+    ctx.fillText(k,ox,801);ox+=62;
+  });
+  ctx.textAlign='left';
+
+  // ===== 右侧：简化 UI 卡片 =====
+  const px=800,py=110,pw=720,ph=680;
+  ctx.save();ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=50;ctx.shadowOffsetY=20;
+  rr(ctx,px,py,pw,ph,22);ctx.fillStyle='rgba(24,27,35,.96)';ctx.fill();ctx.restore();
+  rr(ctx,px,py,pw,ph,22);ctx.strokeStyle='rgba(200,169,107,.6)';ctx.lineWidth=1.8;ctx.stroke();
+
+  // 卡头
+  ctx.beginPath();ctx.arc(px+70,py+78,40,0,Math.PI*2);
+  ctx.fillStyle='rgba(232,93,78,.18)';ctx.fill();ctx.strokeStyle=WX.火;ctx.lineWidth=3;ctx.stroke();
+  ctx.fillStyle=WX.火;ctx.font=`bold 30px ${SERIF}`;ctx.textAlign='center';ctx.fillText('丙火',px+70,py+89);
+  ctx.textAlign='left';
+  ctx.fillStyle='#F5F0E6';ctx.font=`bold 32px ${SANS}`;ctx.fillText('裴烬霄',px+130,py+70);
+  ctx.fillStyle='#F2C94C';ctx.font=`bold 24px ${SERIF}`;ctx.fillText('【 傲世破法狂儒 · 伤官格 】',px+130,py+106);
+  rr(ctx,px+pw-150,py+40,110,36,8);ctx.fillStyle='rgba(255,184,0,.2)';ctx.fill();
+  ctx.strokeStyle='#FFB800';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#FFD04D';ctx.font=`bold 20px ${SANS}`;ctx.textAlign='center';
+  ctx.fillText('SSR',px+pw-95,py+65);ctx.textAlign='left';
+
+  // 四柱
+  const P=[['壬','水','子','水','年'],['己','土','酉','金','月'],['丙','火','寅','木','日'],['甲','木','午','火','时']];
+  const cw=150,cg=16,sx=px+32,sy=py+150;
+  P.forEach((p,i)=>{
+    const x=sx+i*(cw+cg);
+    rr(ctx,x,sy,cw,170,12);
+    ctx.fillStyle=i==2?'rgba(200,169,107,.12)':'rgba(14,16,22,.85)';ctx.fill();
+    ctx.strokeStyle=i==2?'#C8A96B':'rgba(255,255,255,.1)';ctx.lineWidth=i==2?2:1;ctx.stroke();
+    ctx.textAlign='center';
+    ctx.fillStyle='#8E9299';ctx.font=`18px ${SANS}`;ctx.fillText(p[4]+'柱',x+cw/2,sy+30);
+    ctx.fillStyle=WX[p[1]];ctx.font=`bold 56px ${SERIF}`;ctx.fillText(p[0],x+cw/2,sy+96);
+    ctx.fillStyle=WX[p[3]];ctx.fillText(p[2],x+cw/2,sy+152);
+  });
+  ctx.textAlign='left';
+
+  // 属性条
+  const S=[['伤官','技能伤害','+48.5%',.92,'#FFB800'],
+           ['偏印','冷却缩减','+34.2%',.78,'#C066E8'],
+           ['正财','金币掉率','+62.0%',.84,'#C066E8'],
+           ['七杀','卖血增益','+0.68%',.58,'#4A98E8'],
+           ['比肩','生命上限','2,180',.48,'#4A98E8']];
+  S.forEach((s,i)=>{
+    const y=sy+212+i*58,x=px+32,w=pw-64;
+    rr(ctx,x,y,64,34,8);ctx.fillStyle=s[4]+'30';ctx.fill();
+    ctx.strokeStyle=s[4];ctx.lineWidth=1.3;ctx.stroke();
+    ctx.fillStyle=s[4];ctx.font=`bold 20px ${SANS}`;ctx.textAlign='center';
+    ctx.fillText(s[0],x+32,y+24);
+    ctx.textAlign='left';ctx.fillStyle='#E5E7EB';ctx.font=`500 22px ${SANS}`;
+    ctx.fillText(s[1],x+80,y+25);
+    rr(ctx,x+210,y+10,300,14,7);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fill();
+    rr(ctx,x+210,y+10,300*s[3],14,7);ctx.fillStyle=s[4];ctx.fill();
+    ctx.textAlign='right';ctx.fillStyle=s[4];ctx.font=`bold 24px ${SANS}`;
+    ctx.fillText(s[2],x+w,y+26);ctx.textAlign='left';
+  });
+
+  // 底部署名
+  ctx.fillStyle='#6E737D';ctx.font=`18px ${SANS}`;
+  ctx.fillText('把生辰，变成你的角色面板',96,858);
+}
+function dl(){
+  const a=document.createElement('a');a.download='ganzhi_rpg_cover.png';
+  a.href=document.getElementById('c').toDataURL('image/png');a.click();
+}
+draw();
+</script>
+</body>
+</html>

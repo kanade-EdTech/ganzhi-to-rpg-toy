@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "d327b514-6ede-43a7-8011-c83b6e38a418",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "F:\\VS_Code_Project\\ganzhi-to-rpg-toy\\.archify\\architecture-ganzhi-rpg-20261108-092200\\candidate.json",
+  "output": "F:\\VS_Code_Project\\ganzhi-to-rpg-toy\\.archify\\architecture-ganzhi-rpg-20261108-092200\\ganzhi-rpg-architecture.html",
+  "specification": {
+    "sha256": "2a16ad6588a73204699ceaeaa7df8fced0a443e8ac94c541845a9b53b9388654",
+    "bytes": 9201
+  },
+  "artifact": {
+    "sha256": "79be760da858cf8f961307d2b40039082a5d4105daeb24b5cd9c1e6d1d759597",
+    "bytes": 854687
+  }
+}
